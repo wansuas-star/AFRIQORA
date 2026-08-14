@@ -1,0 +1,21 @@
+{
+  "name": "afriqora",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AFRIQORA prototype app",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "test:auth": "node tests/run-with-server.js tests/auth-test.js",
+    "test:creator": "node tests/run-with-server.js tests/creator-dashboard-test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "helmet": "^6.0.1",
+    "node-fetch": "^2.6.7"
+  }
+}

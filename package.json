@@ -8,14 +8,42 @@
   "scripts": {
     "start": "node server/index.js",
     "test:auth": "node tests/run-with-server.js tests/auth-test.js",
-    "test:creator": "node tests/run-with-server.js tests/creator-dashboard-test.js"
+    "test:creator": "node tests/run-with-server.js tests/creator-dashboard-test.js",
+    "test:smart-reach": "node tests/run-with-server.js tests/smart-reach-test.js",
+    "test:home-feed": "node tests/run-with-server.js tests/home-feed-test.js",
+    "test:search": "node tests/run-with-server.js tests/search-test.js",
+    "test:notifications": "node tests/run-with-server.js tests/notifications-test.js",
+    "cap:copy-web": "powershell -Command \"Copy-Item index.html www\\; Copy-Item styles.css www\\; Copy-Item script.js www\\; if (Test-Path assets) { Copy-Item -Recurse -Force assets www\\ }; Write-Host 'Web assets copied to www/'\"",
+    "cap:sync": "npm run cap:copy-web && npx cap sync",
+    "cap:android": "npm run cap:copy-web && npx cap sync android && npx cap open android",
+    "cap:ios": "npm run cap:copy-web && npx cap sync ios && npx cap open ios",
+    "cap:build:android": "npm run cap:copy-web && npx cap sync android",
+    "cap:build:ios": "npm run cap:copy-web && npx cap sync ios"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/camera": "^6.1.3",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
+    "@capacitor/push-notifications": "^6.0.5",
+    "@capacitor/splash-screen": "^6.0.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.18.2",
     "helmet": "^6.0.1",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "sql.js": "^1.11.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "prisma@5.22.0": true,
+    "@prisma/engines@5.22.0": true
   }
 }

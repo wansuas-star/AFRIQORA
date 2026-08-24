@@ -4,6 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+// Test the connection asynchronously so it doesn't block startup
+prisma.$connect()
+  .then(() => console.log('Prisma connected successfully to smartreach.db'))
+  .catch((e) => console.error('Prisma connection failed:', e));
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 const ADMIN_KEY = process.env.ADMIN_KEY || 'change-me-in-production';
@@ -295,44 +302,91 @@ app.get('/creator/:id', (req, res, next) => {
 // --- Social interactions: likes, comments, follows, shares ---
 
 // like a video (unique per user)
-app.post('/interactions/like', (req, res) => {
-  const { videoId, userId } = req.body || {};
-  if (!videoId || !userId) return res.status(400).json({ error: 'videoId and userId required' });
-  const state = ensureState();
-  state.likes = state.likes || {};
-  state.likes[videoId] = state.likes[videoId] || {};
-  if (state.likes[videoId][userId]) return res.json({ ok: true, liked: false, reason: 'already' });
-  state.likes[videoId][userId] = Date.now();
-  // ensure video record
-  state.videos = state.videos || {};
-  state.videos[videoId] = state.videos[videoId] || { views:0, uniqueViewers:{}, usedNonces:{} };
-  saveState(state);
-  return res.json({ ok: true, liked: true, likesCount: Object.keys(state.likes[videoId]).length });
+app.post('/interactions/like', async (req, res) => {
+  try {
+    const { videoId, userId } = req.body || {};
+    if (!videoId || !userId) return res.status(400).json({ error: 'videoId and userId required' });
+    const state = ensureState();
+    state.likes = state.likes || {};
+    state.likes[videoId] = state.likes[videoId] || {};
+    if (state.likes[videoId][userId]) return res.json({ ok: true, liked: false, reason: 'already' });
+    state.likes[videoId][userId] = Date.now();
+    // ensure video record
+    state.videos = state.videos || {};
+    state.videos[videoId] = state.videos[videoId] || { views:0, uniqueViewers:{}, usedNonces:{} };
+    saveState(state);
+
+    try {
+      await prisma.postLike.create({
+        data: { userId: String(userId), postId: String(videoId) }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for postLike create:', e);
+    }
+
+    return res.json({ ok: true, liked: true, likesCount: Object.keys(state.likes[videoId]).length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
+  }
 });
 
 // unlike a video
-app.post('/interactions/unlike', (req, res) => {
-  const { videoId, userId } = req.body || {};
-  if (!videoId || !userId) return res.status(400).json({ error: 'videoId and userId required' });
-  const state = ensureState();
-  if (state.likes && state.likes[videoId] && state.likes[videoId][userId]) {
-    delete state.likes[videoId][userId];
-    saveState(state);
-    return res.json({ ok: true, liked: false, likesCount: Object.keys(state.likes[videoId]||{}).length });
+app.post('/interactions/unlike', async (req, res) => {
+  try {
+    const { videoId, userId } = req.body || {};
+    if (!videoId || !userId) return res.status(400).json({ error: 'videoId and userId required' });
+    const state = ensureState();
+    let removed = false;
+    if (state.likes && state.likes[videoId] && state.likes[videoId][userId]) {
+      delete state.likes[videoId][userId];
+      saveState(state);
+      removed = true;
+    }
+
+    try {
+      await prisma.postLike.deleteMany({
+        where: { userId: String(userId), postId: String(videoId) }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for postLike delete:', e);
+    }
+    
+    if (removed) {
+      return res.json({ ok: true, liked: false, likesCount: Object.keys(state.likes[videoId]||{}).length });
+    }
+    return res.json({ ok: true, liked: false, reason: 'not-found' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
   }
-  return res.json({ ok: true, liked: false, reason: 'not-found' });
 });
 
 // add a comment
-app.post('/comments', (req, res) => {
-  const { videoId, authorId, text } = req.body || {};
-  if (!videoId || !authorId || !text) return res.status(400).json({ error: 'videoId, authorId and text required' });
-  const state = ensureState();
-  const comment = { id: 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2,6), videoId: String(videoId), authorId: String(authorId), text: String(text), createdAt: new Date().toISOString() };
-  state.comments = state.comments || [];
-  state.comments.push(comment);
-  saveState(state);
-  return res.json({ ok:true, comment });
+app.post('/comments', async (req, res) => {
+  try {
+    const { videoId, authorId, text } = req.body || {};
+    if (!videoId || !authorId || !text) return res.status(400).json({ error: 'videoId, authorId and text required' });
+    const state = ensureState();
+    const commentId = 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+    const comment = { id: commentId, videoId: String(videoId), authorId: String(authorId), text: String(text), createdAt: new Date().toISOString() };
+    state.comments = state.comments || [];
+    state.comments.push(comment);
+    saveState(state);
+
+    try {
+      await prisma.comment.create({
+        data: { id: commentId, postId: String(videoId), userId: String(authorId), text: String(text) }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for comment create:', e);
+    }
+
+    return res.json({ ok:true, comment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
+  }
 });
 
 // get comments for a video
@@ -345,45 +399,87 @@ app.get('/comments', (req, res) => {
 });
 
 // follow a creator
-app.post('/follow', (req, res) => {
-  const { creatorId, followerId } = req.body || {};
-  if (!creatorId || !followerId) return res.status(400).json({ error: 'creatorId and followerId required' });
-  const state = ensureState();
-  state.follows = state.follows || { followersByCreator: {}, followingByUser: {} };
-  state.follows.followersByCreator[creatorId] = state.follows.followersByCreator[creatorId] || {};
-  state.follows.followingByUser[followerId] = state.follows.followingByUser[followerId] || {};
-  if (state.follows.followersByCreator[creatorId][followerId]) return res.json({ ok:true, followed:false, reason:'already' });
-  state.follows.followersByCreator[creatorId][followerId] = Date.now();
-  state.follows.followingByUser[followerId][creatorId] = Date.now();
-  saveState(state);
-  return res.json({ ok:true, followed:true, followersCount: Object.keys(state.follows.followersByCreator[creatorId]).length });
+app.post('/follow', async (req, res) => {
+  try {
+    const { creatorId, followerId } = req.body || {};
+    if (!creatorId || !followerId) return res.status(400).json({ error: 'creatorId and followerId required' });
+    const state = ensureState();
+    state.follows = state.follows || { followersByCreator: {}, followingByUser: {} };
+    state.follows.followersByCreator[creatorId] = state.follows.followersByCreator[creatorId] || {};
+    state.follows.followingByUser[followerId] = state.follows.followingByUser[followerId] || {};
+    if (state.follows.followersByCreator[creatorId][followerId]) return res.json({ ok:true, followed:false, reason:'already' });
+    state.follows.followersByCreator[creatorId][followerId] = Date.now();
+    state.follows.followingByUser[followerId][creatorId] = Date.now();
+    saveState(state);
+
+    try {
+      await prisma.userFollow.create({
+        data: { followerId: String(followerId), followingId: String(creatorId) }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for follow create:', e);
+    }
+
+    return res.json({ ok:true, followed:true, followersCount: Object.keys(state.follows.followersByCreator[creatorId]).length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
+  }
 });
 
 // unfollow
-app.post('/unfollow', (req, res) => {
-  const { creatorId, followerId } = req.body || {};
-  if (!creatorId || !followerId) return res.status(400).json({ error: 'creatorId and followerId required' });
-  const state = ensureState();
-  if (state.follows && state.follows.followersByCreator && state.follows.followersByCreator[creatorId] && state.follows.followersByCreator[creatorId][followerId]) {
-    delete state.follows.followersByCreator[creatorId][followerId];
+app.post('/unfollow', async (req, res) => {
+  try {
+    const { creatorId, followerId } = req.body || {};
+    if (!creatorId || !followerId) return res.status(400).json({ error: 'creatorId and followerId required' });
+    const state = ensureState();
+    if (state.follows && state.follows.followersByCreator && state.follows.followersByCreator[creatorId] && state.follows.followersByCreator[creatorId][followerId]) {
+      delete state.follows.followersByCreator[creatorId][followerId];
+    }
+    if (state.follows && state.follows.followingByUser && state.follows.followingByUser[followerId] && state.follows.followingByUser[followerId][creatorId]) {
+      delete state.follows.followingByUser[followerId][creatorId];
+    }
+    saveState(state);
+
+    try {
+      await prisma.userFollow.deleteMany({
+        where: { followerId: String(followerId), followingId: String(creatorId) }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for follow delete:', e);
+    }
+
+    return res.json({ ok:true, followed:false });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
   }
-  if (state.follows && state.follows.followingByUser && state.follows.followingByUser[followerId] && state.follows.followingByUser[followerId][creatorId]) {
-    delete state.follows.followingByUser[followerId][creatorId];
-  }
-  saveState(state);
-  return res.json({ ok:true, followed:false });
 });
 
 // share a video (record only)
-app.post('/interactions/share', (req, res) => {
-  const { videoId, userId, platform } = req.body || {};
-  if (!videoId || !userId) return res.status(400).json({ error: 'videoId and userId required' });
-  const state = ensureState();
-  state.shares = state.shares || {};
-  state.shares[videoId] = state.shares[videoId] || [];
-  state.shares[videoId].push({ userId: String(userId), platform: platform||null, createdAt: new Date().toISOString() });
-  saveState(state);
-  return res.json({ ok:true, sharesCount: state.shares[videoId].length });
+app.post('/interactions/share', async (req, res) => {
+  try {
+    const { videoId, userId, platform } = req.body || {};
+    if (!videoId || !userId) return res.status(400).json({ error: 'videoId and userId required' });
+    const state = ensureState();
+    state.shares = state.shares || {};
+    state.shares[videoId] = state.shares[videoId] || [];
+    state.shares[videoId].push({ userId: String(userId), platform: platform||null, createdAt: new Date().toISOString() });
+    saveState(state);
+
+    try {
+      await prisma.postShare.create({
+        data: { postId: String(videoId), userId: String(userId), platform: platform || null }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for share create:', e);
+    }
+
+    return res.json({ ok:true, sharesCount: state.shares[videoId].length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
+  }
 });
 
 // query likes for a video and whether a user liked it
@@ -426,28 +522,52 @@ app.get('/connect/services', (req, res) => {
 });
 
 // --- Authentication: register, login, logout, me ---
-app.post('/auth/register', (req, res) => {
-  const { email, password, displayName } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-  const state = ensureState();
-  // ensure unique email
-  const existing = Object.values(state.users).find(u => String(u.email).toLowerCase() === String(email).toLowerCase());
-  if (existing) return res.status(400).json({ error: 'email in use' });
-  const userId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
-  const hash = bcrypt.hashSync(String(password), 10);
-  state.users[userId] = {
-    afriqoraId: generateAfriqoraId(),
-    id: userId,
-    email: String(email),
-    passwordHash: hash,
-    displayName: String(displayName),
-    createdAt: new Date()
-  };
-saveState(state);
-  // create session
-  const sid = createSession(state, userId);
-  res.setHeader('Set-Cookie', `afr_session=${encodeURIComponent(sid)}; HttpOnly; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS/1000)}`);
-  res.json({ ok:true, user: safeUser(state.users[userId]) });
+app.post('/auth/register', async (req, res) => {
+  try {
+    const { email, password, displayName } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    const state = ensureState();
+    // ensure unique email
+    const existing = Object.values(state.users).find(u => String(u.email).toLowerCase() === String(email).toLowerCase());
+    if (existing) return res.status(400).json({ error: 'email in use' });
+    const userId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+    const hash = bcrypt.hashSync(String(password), 10);
+    const afriqoraId = generateAfriqoraId();
+    
+    // Write to legacy state
+    state.users[userId] = {
+      afriqoraId: afriqoraId,
+      id: userId,
+      email: String(email),
+      passwordHash: hash,
+      displayName: String(displayName),
+      createdAt: new Date()
+    };
+    saveState(state);
+
+    // Dual-write to Prisma
+    try {
+      await prisma.user.create({
+        data: {
+          id: userId,
+          afriqoraId: afriqoraId,
+          email: String(email),
+          passwordHash: hash,
+          displayName: String(displayName),
+        }
+      });
+    } catch (dbErr) {
+      console.error('Prisma write failed for user register:', dbErr);
+    }
+
+    // create session
+    const sid = createSession(state, userId);
+    res.setHeader('Set-Cookie', `afr_session=${encodeURIComponent(sid)}; HttpOnly; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS/1000)}`);
+    res.json({ ok:true, user: safeUser(state.users[userId]) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.post('/auth/login', (req, res) => {
@@ -471,31 +591,113 @@ app.post('/auth/logout', (req, res) => {
   res.json({ ok:true });
 });
 
-app.get('/auth/me', (req, res) => {
+app.get('/auth/me', async (req, res) => {
   if (!req.userId) return res.json({ user: null });
-  const state = ensureState(); const u = state.users && state.users[req.userId]; if (!u) return res.json({ user: null });
-  if (!u.afriqoraId) {
-    u.afriqoraId = generateAfriqoraId();
-    saveState(state);
+  const state = ensureState(); 
+  let u = null;
+  
+  try {
+    const prismaUser = await prisma.user.findUnique({ where: { id: String(req.userId) } });
+    if (prismaUser) {
+      u = prismaUser;
+    }
+  } catch (e) {
+    console.error('Prisma read failed for auth/me:', e);
   }
+
+  // Fallback to legacy
+  if (!u) {
+    u = state.users && state.users[req.userId];
+    if (!u) return res.json({ user: null });
+    if (!u.afriqoraId) {
+      u.afriqoraId = generateAfriqoraId();
+      saveState(state);
+    }
+  } else if (!u.afriqoraId) {
+    // Make sure Prisma user has afriqoraId (which is required in DB anyway)
+    u.afriqoraId = generateAfriqoraId();
+    await prisma.user.update({ where: { id: u.id }, data: { afriqoraId: u.afriqoraId } }).catch(()=>{});
+  }
+
   res.json({ user: safeUser(u) });
 });
 
 // --- Authenticated creator identity, profile, and post APIs ---
-app.get('/creator/dashboard', requireAuth, (req, res) => {
+app.get('/creator/dashboard', requireAuth, async (req, res) => {
   const state = ensureState();
-  const user = state.users[req.userId];
-  if (!user.afriqoraId) {
-    user.afriqoraId = generateAfriqoraId();
-    saveState(state);
+  let user = null;
+  try {
+    user = await prisma.user.findUnique({ where: { id: String(req.userId) } });
+  } catch (e) {
+    console.error('Prisma user fetch failed:', e);
   }
+
+  if (!user) {
+    user = state.users[req.userId];
+    if (!user.afriqoraId) {
+      user.afriqoraId = generateAfriqoraId();
+      saveState(state);
+    }
+  }
+
   state.creators = state.creators || {};
   const creatorStats = state.creators[user.afriqoraId] || { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
-  const myPosts = (state.creatorPosts || [])
-    .filter(p => String(p.ownerUserId) === String(user.id))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map(p => toPublicPost(state, p));
-  const businessProfile = state.businessProfiles[user.id] || null;
+  
+  let myPosts = [];
+  let businessProfile = null;
+  
+  try {
+    const pPosts = await prisma.post.findMany({
+      where: { authorId: String(req.userId) },
+      orderBy: { createdAt: 'desc' }
+    });
+    if (pPosts && pPosts.length > 0) {
+      myPosts = pPosts.map(p => ({
+        id: p.id,
+        ownerUserId: p.authorId,
+        title: p.title,
+        content: p.text,
+        category: p.category,
+        location: p.location,
+        website: p.website,
+        contact: p.contact,
+        image: p.image,
+        video: p.video,
+        status: p.status,
+        createdAt: p.createdAt.toISOString()
+      }));
+    }
+
+    const bProf = await prisma.businessProfile.findFirst({ where: { ownerId: String(req.userId) } });
+    if (bProf) {
+      businessProfile = {
+        id: bProf.id,
+        ownerUserId: bProf.ownerId,
+        businessName: bProf.businessName,
+        category: bProf.category,
+        location: bProf.location,
+        website: bProf.website,
+        contact: bProf.phone,
+        description: bProf.description,
+        logo: bProf.logo,
+        createdAt: bProf.createdAt.toISOString()
+      };
+    }
+  } catch (dbErr) {
+    console.error('Prisma dashboard fetch failed:', dbErr);
+  }
+
+  // Fallback to legacy
+  if (myPosts.length === 0) {
+    myPosts = (state.creatorPosts || [])
+      .filter(p => String(p.ownerUserId) === String(user.id))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map(p => toPublicPost(state, p));
+  }
+  if (!businessProfile) {
+    businessProfile = state.businessProfiles[user.id] || null;
+  }
+
   res.json({
     ok: true,
     user: safeUser(user),
@@ -506,69 +708,177 @@ app.get('/creator/dashboard', requireAuth, (req, res) => {
   });
 });
 
-app.post('/creator/business-profile', requireAuth, (req, res) => {
-  const state = ensureState();
-  const user = state.users[req.userId];
-  const body = req.body || {};
-  const profile = {
-    id: (state.businessProfiles[user.id] && state.businessProfiles[user.id].id) || ('bp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)),
-    ownerUserId: user.id,
-    ownerAfriqoraId: user.afriqoraId,
-    ownerDisplayName: sanitizeText(body.ownerDisplayName || user.displayName || '', 120),
-    businessName: sanitizeText(body.businessName, 160),
-    category: sanitizeText(body.category, 100),
-    location: sanitizeText(body.location, 120),
-    website: sanitizeText(body.website, 200),
-    contact: sanitizeText(body.contact, 120),
-    description: sanitizeText(body.description, 1200),
-    logo: normalizeOptionalDataUrl(body.logo, 800000),
-    updatedAt: new Date().toISOString(),
-    createdAt: (state.businessProfiles[user.id] && state.businessProfiles[user.id].createdAt) || new Date().toISOString()
-  };
-  if (!profile.businessName) return res.status(400).json({ error: 'businessName is required' });
-  state.businessProfiles[user.id] = profile;
-  saveState(state);
-  res.json({ ok: true, businessProfile: profile });
+app.post('/creator/business-profile', requireAuth, async (req, res) => {
+  try {
+    const state = ensureState();
+    const user = state.users[req.userId];
+    const body = req.body || {};
+    const profile = {
+      id: (state.businessProfiles[user.id] && state.businessProfiles[user.id].id) || ('bp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)),
+      ownerUserId: user.id,
+      ownerAfriqoraId: user.afriqoraId,
+      ownerDisplayName: sanitizeText(body.ownerDisplayName || user.displayName || '', 120),
+      businessName: sanitizeText(body.businessName, 160),
+      category: sanitizeText(body.category, 100),
+      location: sanitizeText(body.location, 120),
+      website: sanitizeText(body.website, 200),
+      contact: sanitizeText(body.contact, 120),
+      description: sanitizeText(body.description, 1200),
+      logo: normalizeOptionalDataUrl(body.logo, 800000),
+      updatedAt: new Date().toISOString(),
+      createdAt: (state.businessProfiles[user.id] && state.businessProfiles[user.id].createdAt) || new Date().toISOString()
+    };
+    if (!profile.businessName) return res.status(400).json({ error: 'businessName is required' });
+    state.businessProfiles[user.id] = profile;
+    saveState(state);
+
+    try {
+      await prisma.businessProfile.upsert({
+        where: { id: profile.id },
+        update: {
+          businessName: profile.businessName,
+          category: profile.category,
+          location: profile.location,
+          website: profile.website,
+          phone: profile.contact,
+          description: profile.description,
+          logo: profile.logo
+        },
+        create: {
+          id: profile.id,
+          ownerId: user.id,
+          businessName: profile.businessName,
+          category: profile.category,
+          location: profile.location,
+          website: profile.website,
+          phone: profile.contact,
+          description: profile.description,
+          logo: profile.logo,
+          createdAt: new Date(profile.createdAt)
+        }
+      });
+    } catch (dbErr) {
+      console.error('Prisma write failed for business profile:', dbErr);
+    }
+
+    res.json({ ok: true, businessProfile: profile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-app.post('/creator/posts', requireAuth, (req, res) => {
-  const state = ensureState();
-  const user = state.users[req.userId];
-  const body = req.body || {};
-  const title = sanitizeText(body.title, 180);
-  const content = sanitizeText(body.content, 4000);
-  if (!title || !content) return res.status(400).json({ error: 'title and content are required' });
+app.post('/creator/posts', requireAuth, async (req, res) => {
+  try {
+    const state = ensureState();
+    const user = state.users[req.userId];
+    const body = req.body || {};
+    const title = sanitizeText(body.title, 180);
+    const content = sanitizeText(body.content, 4000);
+    if (!title || !content) return res.status(400).json({ error: 'title and content are required' });
 
-  const post = {
-    id: 'cp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-    ownerUserId: user.id,
-    ownerAfriqoraId: user.afriqoraId,
-    ownerDisplayName: sanitizeText(user.displayName || 'Creator', 120),
-    title,
-    content,
-    category: sanitizeText(body.category, 100),
-    location: sanitizeText(body.location, 120),
-    website: sanitizeText(body.website, 200),
-    contact: sanitizeText(body.contact, 120),
-    image: normalizeOptionalDataUrl(body.image, 800000),
-    video: normalizeOptionalDataUrl(body.video, 1800000),
-    status: sanitizeText(body.status, 40) || 'published',
-    createdAt: new Date().toISOString(),
-    updatedAt: null
-  };
+    const postId = 'cp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    const category = sanitizeText(body.category, 100);
+    const location = sanitizeText(body.location, 120);
+    const website = sanitizeText(body.website, 200);
+    const contact = sanitizeText(body.contact, 120);
+    const image = normalizeOptionalDataUrl(body.image, 800000);
+    const video = normalizeOptionalDataUrl(body.video, 1800000);
+    const status = sanitizeText(body.status, 40) || 'published';
+    const createdAt = new Date();
+    const isBusiness = !!(state.businessProfiles && state.businessProfiles[user.id]);
+    
+    const post = {
+      id: postId,
+      ownerUserId: user.id,
+      ownerAfriqoraId: user.afriqoraId,
+      ownerDisplayName: sanitizeText(user.displayName || 'Creator', 120),
+      title,
+      content,
+      category,
+      location,
+      website,
+      contact,
+      image,
+      video,
+      status,
+      createdAt: createdAt.toISOString(),
+      updatedAt: null
+    };
 
-  state.creatorPosts = state.creatorPosts || [];
-  state.creatorPosts.unshift(post);
-  saveState(state);
-  res.status(201).json({ ok: true, post: toPublicPost(state, post) });
+    // Dual-write to Prisma
+    try {
+      await prisma.post.create({
+        data: {
+          id: postId,
+          authorId: user.id,
+          businessId: isBusiness ? state.businessProfiles[user.id].id : null,
+          title: title,
+          text: content,
+          category: category,
+          location: location,
+          website: website,
+          contact: contact,
+          image: image,
+          video: video,
+          status: status,
+          type: video ? 'video' : 'post',
+          createdAt: createdAt
+        }
+      });
+    } catch (dbErr) {
+      console.error('Prisma write failed for post create:', dbErr);
+    }
+
+    state.creatorPosts = state.creatorPosts || [];
+    state.creatorPosts.unshift(post);
+    saveState(state);
+    res.status(201).json({ ok: true, post: toPublicPost(state, post) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-app.get('/creator/posts/mine', requireAuth, (req, res) => {
+app.get('/creator/posts/mine', requireAuth, async (req, res) => {
   const state = ensureState();
-  const mine = (state.creatorPosts || [])
-    .filter(p => String(p.ownerUserId) === String(req.userId))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map(p => toPublicPost(state, p));
+  let mine = [];
+  try {
+    const prismaPosts = await prisma.post.findMany({
+      where: { authorId: String(req.userId) },
+      orderBy: { createdAt: 'desc' }
+    });
+    if (prismaPosts && prismaPosts.length > 0) {
+      mine = prismaPosts.map(p => {
+        // Map Prisma Post to legacy public post format
+        return {
+          id: p.id,
+          ownerUserId: p.authorId,
+          title: p.title,
+          content: p.text,
+          category: p.category,
+          location: p.location,
+          website: p.website,
+          contact: p.contact,
+          image: p.image,
+          video: p.video,
+          status: p.status,
+          createdAt: p.createdAt.toISOString()
+        };
+      });
+    }
+  } catch (dbErr) {
+    console.error('Prisma read failed for creator/posts/mine:', dbErr);
+  }
+
+  // Fallback to legacy if Prisma results are empty
+  if (mine.length === 0) {
+    mine = (state.creatorPosts || [])
+      .filter(p => String(p.ownerUserId) === String(req.userId))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map(p => toPublicPost(state, p));
+  }
+
   res.json({ ok: true, posts: mine });
 });
 
@@ -611,24 +921,76 @@ app.delete('/creator/posts/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/creator/posts/public', (req, res) => {
+app.get('/creator/posts/public', async (req, res) => {
   const state = ensureState();
   const q = sanitizeText(req.query.q || '', 200).toLowerCase();
   const category = sanitizeText(req.query.category || '', 100).toLowerCase();
   const location = sanitizeText(req.query.location || '', 120).toLowerCase();
-  const items = (state.creatorPosts || [])
-    .filter(p => String(p.status || 'published').toLowerCase() === 'published')
-    .filter(p => {
-      if (category && String(p.category || '').toLowerCase() !== category) return false;
-      if (location && !String(p.location || '').toLowerCase().includes(location)) return false;
-      if (!q) return true;
-      const hay = [p.title, p.content, p.category, p.location, p.website, p.contact, p.ownerDisplayName, p.ownerAfriqoraId]
-        .map(v => String(v || '').toLowerCase())
-        .join(' ');
-      return hay.includes(q);
-    })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map(p => toPublicPost(state, p));
+  
+  let items = [];
+  try {
+    const whereClause = { status: 'published' };
+    if (category) {
+      // Basic match for now, could be improved with Prisma text search
+      whereClause.category = { contains: category };
+    }
+    if (location) {
+      whereClause.location = { contains: location };
+    }
+    
+    // For global search, we fetch and filter in memory as a simple fallback if Prisma FTS isn't set up
+    const prismaPosts = await prisma.post.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (prismaPosts && prismaPosts.length > 0) {
+      let filtered = prismaPosts;
+      if (q) {
+        filtered = prismaPosts.filter(p => {
+          const hay = [p.title, p.text, p.category, p.location, p.website, p.contact].map(v => String(v || '').toLowerCase()).join(' ');
+          return hay.includes(q);
+        });
+      }
+
+      items = filtered.map(p => {
+        return {
+          id: p.id,
+          ownerUserId: p.authorId,
+          title: p.title,
+          content: p.text,
+          category: p.category,
+          location: p.location,
+          website: p.website,
+          contact: p.contact,
+          image: p.image,
+          video: p.video,
+          status: p.status,
+          createdAt: p.createdAt.toISOString()
+        };
+      });
+    }
+  } catch (dbErr) {
+    console.error('Prisma read failed for creator/posts/public:', dbErr);
+  }
+
+  // Fallback to legacy if Prisma is empty
+  if (items.length === 0) {
+    items = (state.creatorPosts || [])
+      .filter(p => String(p.status || 'published').toLowerCase() === 'published')
+      .filter(p => {
+        if (category && String(p.category || '').toLowerCase() !== category) return false;
+        if (location && !String(p.location || '').toLowerCase().includes(location)) return false;
+        if (!q) return true;
+        const hay = [p.title, p.content, p.category, p.location, p.website, p.contact, p.ownerDisplayName, p.ownerAfriqoraId]
+          .map(v => String(v || '').toLowerCase())
+          .join(' ');
+        return hay.includes(q);
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map(p => toPublicPost(state, p));
+  }
+
   res.json({ ok: true, posts: items });
 });
 

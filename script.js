@@ -1,3 +1,186 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// AFRIQORA Capacitor Native Bridge
+// Detects whether the app is running inside a Capacitor (Android/iOS) container
+// and enables native capabilities: push notifications, session Bearer tokens.
+// This block must execute before any API calls.
+// ─────────────────────────────────────────────────────────────────────────────
+(function initCapacitorBridge() {
+  // Determine if running in a native Capacitor container
+  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  window.__afriqoraNative = isNative;
+
+  if (!isNative) return;
+
+  // On native platforms, register for push notifications after the device is ready.
+  // Capacitor plugins are loaded async; wait for 'deviceready' equivalent via DOMContentLoaded.
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const { PushNotifications } = window.Capacitor.Plugins;
+      if (!PushNotifications) return;
+
+      // Request permission
+      const permResult = await PushNotifications.requestPermissions();
+      if (permResult.receive !== 'granted') return;
+
+      // Register with FCM / APNs
+      await PushNotifications.register();
+
+      // Receive the device token
+      PushNotifications.addListener('registration', async (token) => {
+        const platform = window.Capacitor.getPlatform(); // 'android' | 'ios'
+        try {
+          await fetch(apiUrl('/notifications/push/register-token'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...afriqoraBearerHeader()
+            },
+            body: JSON.stringify({ token: token.value, platform })
+          });
+        } catch (e) { /* silent – push is best-effort */ }
+      });
+
+      // Foreground push handler – show a brief banner
+      PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;top:env(safe-area-inset-top,12px);left:50%;transform:translateX(-50%);background:#1a2b4a;color:#fff;padding:0.6rem 1rem;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:2147483647;font-size:0.875rem;max-width:90vw;text-align:center;';
+        banner.textContent = `${notification.title || 'AFRIQORA'}: ${notification.body || ''}`;
+        document.body.appendChild(banner);
+        setTimeout(() => { try { document.body.removeChild(banner); } catch(e) {} }, 4000);
+      });
+
+    } catch (e) { /* push not available in this environment */ }
+  });
+})();
+
+// Returns the Authorization Bearer header if a session token is stored (native only)
+function afriqoraBearerHeader() {
+  try {
+    const sid = localStorage.getItem('afriqoraSessionId');
+    if (sid) return { 'Authorization': `Bearer ${sid}` };
+  } catch (e) {}
+  return {};
+}
+
+// -----------------------------------------------------------------------------
+// MULTILINGUAL I18N SYSTEM
+// -----------------------------------------------------------------------------
+const I18N = {
+  en: {
+    'home.find_service': 'Find a Service',
+    'home.explore_nearby': 'Explore Nearby',
+    'search.placeholder': 'Search anything...',
+    'nav.home': 'Home',
+    'nav.search': 'Search',
+    'nav.activity': 'Activity',
+    'nav.notifications': 'Notifications',
+    'nav.messages': 'Messages',
+    'nav.profile': 'Profile',
+    'nav.settings': 'Settings',
+    'auth.login': 'Log In',
+    'auth.signup': 'Sign Up',
+    'auth.logout': 'Logout',
+    'profile.edit': 'Edit Profile',
+    'profile.dashboard': 'Business Dashboard',
+    'feed.placeholder': 'What are you thinking?',
+    'btn.post': 'Post',
+    'wizard.step1': 'What is the name of your business?',
+    'wizard.step2': 'What do you do?',
+    'wizard.step3': 'Where are you located?',
+    'wizard.step4': 'Contact & Details',
+    'btn.save': 'Save & Publish',
+    'btn.next': 'Next',
+    'btn.back': 'Back',
+    'lang.en': 'English',
+    'lang.fr': 'French',
+    'lang.sw': 'Swahili'
+  },
+  fr: {
+    'home.find_service': 'Trouver un service',
+    'home.explore_nearby': 'Explorer à proximité',
+    'search.placeholder': 'Rechercher quelque chose...',
+    'nav.home': 'Accueil',
+    'nav.search': 'Recherche',
+    'nav.activity': 'Activité',
+    'nav.notifications': 'Notifications',
+    'nav.messages': 'Messages',
+    'nav.profile': 'Profil',
+    'nav.settings': 'Paramètres',
+    'auth.login': 'Connexion',
+    'auth.signup': "S'inscrire",
+    'auth.logout': 'Déconnexion',
+    'profile.edit': 'Modifier le profil',
+    'profile.dashboard': "Tableau de bord de l'entreprise",
+    'feed.placeholder': 'À quoi pensez-vous?',
+    'btn.post': 'Publier',
+    'wizard.step1': 'Quel est le nom de votre entreprise?',
+    'wizard.step2': 'Que faites-vous?',
+    'wizard.step3': 'Où êtes-vous situé?',
+    'wizard.step4': 'Contact & Détails',
+    'btn.save': 'Enregistrer',
+    'btn.next': 'Suivant',
+    'btn.back': 'Retour',
+    'lang.en': 'Anglais',
+    'lang.fr': 'Français',
+    'lang.sw': 'Swahili'
+  },
+  sw: {
+    'home.find_service': 'Tafuta Huduma',
+    'home.explore_nearby': 'Gundua Karibu',
+    'search.placeholder': 'Tafuta chochote...',
+    'nav.home': 'Nyumbani',
+    'nav.search': 'Tafuta',
+    'nav.activity': 'Shughuli',
+    'nav.notifications': 'Arifa',
+    'nav.messages': 'Jumbe',
+    'nav.profile': 'Profaili',
+    'nav.settings': 'Mipangilio',
+    'auth.login': 'Ingia',
+    'auth.signup': 'Jisajili',
+    'auth.logout': 'Toka',
+    'profile.edit': 'Hariri Profaili',
+    'profile.dashboard': 'Dashibodi ya Biashara',
+    'feed.placeholder': 'Unafikiria nini?',
+    'btn.post': 'Chapisha',
+    'wizard.step1': 'Jina la biashara yako ni nani?',
+    'wizard.step2': 'Unafanya nini?',
+    'wizard.step3': 'Upo wapi?',
+    'wizard.step4': 'Mawasiliano na Maelezo',
+    'btn.save': 'Hifadhi',
+    'btn.next': 'Mbele',
+    'btn.back': 'Nyuma',
+    'lang.en': 'Kiingereza',
+    'lang.fr': 'Kifaransa',
+    'lang.sw': 'Kiswahili'
+  }
+};
+
+let currentLang = 'en';
+try {
+  const localSettings = JSON.parse(localStorage.getItem('afriqoraAppSettings') || '{}');
+  if (localSettings && localSettings.languageRegion && localSettings.languageRegion.language) {
+    currentLang = localSettings.languageRegion.language;
+  }
+} catch (e) {}
+
+function t(key) {
+  return I18N[currentLang] && I18N[currentLang][key] ? I18N[currentLang][key] : (I18N['en'][key] || key);
+}
+
+function applyLanguageChange(newLang) {
+  if (newLang) currentLang = newLang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (key) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.placeholder = t(key);
+      } else {
+        el.textContent = t(key);
+      }
+    }
+  });
+}
+
 const toggle = document.querySelector('.nav-toggle');
 const nav = document.querySelector('.site-nav');
 const year = document.getElementById('year');
@@ -102,7 +285,7 @@ const BUSINESS_STORAGE_KEY = "afriqoraBusinessListings";
 const POSTS_STORAGE_KEY = "afriqoraPosts";
 const MARKETPLACE_STORAGE_KEY = "afriqoraMarketplaceListings";
 const MONETIZATION_STORAGE_KEY = "afriqoraMonetization";
-const MONETIZATION_SERVER_URL = (typeof MONETIZATION_SERVER_URL !== 'undefined') ? MONETIZATION_SERVER_URL : 'http://localhost:4000';
+const MONETIZATION_SERVER_URL = (typeof window !== 'undefined' && window.MONETIZATION_SERVER_URL) ? window.MONETIZATION_SERVER_URL : 'http://localhost:4000';
 let authUserCache = null;
 
 function apiBaseUrl() {
@@ -114,7 +297,11 @@ function apiUrl(path) {
 }
 
 async function apiRequest(path, options = {}) {
-  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  // On native Capacitor apps, cookies are blocked in WebViews.
+  // Instead we send the session as an Authorization: Bearer header stored in localStorage.
+  const nativeHeaders = window.__afriqoraNative ? afriqoraBearerHeader() : {};
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, nativeHeaders, options.headers || {});
+  // credentials:'include' is kept for web browser compatibility (cookie auth).
   return fetch(apiUrl(path), Object.assign({}, options, { headers, credentials: 'include' }));
 }
 
@@ -657,7 +844,7 @@ function renderMarketplaceListings(listings = null, container = null) {
         const currency = item.sellerCurrency || (item.sellerCountry ? (getCountryByCode(item.sellerCountry)||{}).currency : null) || 'USD';
         const priceLabel = item.free ? '<strong>Free</strong>' : `<strong>${formatCurrencyAmount(Number(item.price||0), currency)}</strong>`;
     card.innerHTML = `
-      <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:0.5rem;border-bottom:1px solid #eee;padding-bottom:0.5rem;">
+      <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:0.5rem;border-bottom:1px solid rgba(255,255,255,0.12);padding-bottom:0.5rem;">
         <div style="flex:1;">
           <h4>${item.name}</h4>
           <p>${item.description}</p>
@@ -763,6 +950,18 @@ function openMediaViewer(src, { videoId='', creatorId='', source='', title='', p
   async function apiPost(path, body) {
     try { const res = await fetch(apiBase + path, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }); if (!res.ok) return await res.json().catch(()=>({ error: 'failed' })); return await res.json(); } catch(e){ return { error: 'network' }; }
   }
+  async function trackSmartReach(eventType, payload = {}) {
+    try {
+      await apiRequest('/smart-reach/engagement', {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({
+          contentId: String(videoId || ''),
+          eventType,
+          source: source || 'media-viewer'
+        }, payload || {}))
+      });
+    } catch (e) {}
+  }
   const mediaWrapper = document.createElement('div'); mediaWrapper.style.width='100%'; mediaWrapper.style.background='#000'; mediaWrapper.style.padding='0.25rem';
   if (!src) return;
   if (src.startsWith('data:') || src.match(/^https?:\/\//i)) {
@@ -784,9 +983,10 @@ function openMediaViewer(src, { videoId='', creatorId='', source='', title='', p
     likeBtn.appendChild(likeCountSpan);
     const commentToggleBtn = document.createElement('button'); commentToggleBtn.textContent = 'Comments';
     const shareBtn = document.createElement('button'); shareBtn.textContent = 'Share';
+    const notInterestedBtn = document.createElement('button'); notInterestedBtn.textContent = 'Not interested';
     const followBtn = document.createElement('button'); followBtn.textContent = 'Follow';
     const followCountSpan = document.createElement('span'); followCountSpan.style.marginLeft='0.25rem'; followBtn.appendChild(followCountSpan);
-    controls.appendChild(likeBtn); controls.appendChild(commentToggleBtn); controls.appendChild(shareBtn); controls.appendChild(followBtn);
+    controls.appendChild(likeBtn); controls.appendChild(commentToggleBtn); controls.appendChild(shareBtn); controls.appendChild(notInterestedBtn); controls.appendChild(followBtn);
     panel.appendChild(controls);
 
     // comments area (hidden by default)
@@ -858,6 +1058,22 @@ function openMediaViewer(src, { videoId='', creatorId='', source='', title='', p
       if (r && r.ok) { alert('Share recorded'); refreshInteractionState(); }
     });
 
+    notInterestedBtn.addEventListener('click', async ()=>{
+      try {
+        const res = await apiRequest('/content/not-interested', {
+          method: 'POST',
+          body: JSON.stringify({ contentId: String(videoId || ''), reason: 'viewer-feedback' })
+        });
+        if (res.ok) {
+          alert('We will reduce similar recommendations.');
+          try { videoEl.pause(); } catch (e) {}
+          try { document.body.removeChild(root); } catch (e) {}
+          return;
+        }
+      } catch (e) {}
+      alert('Sign in to personalize recommendations.');
+    });
+
     followBtn.addEventListener('click', async ()=>{
       const uid = getClientId();
       if (!creatorId) return;
@@ -879,19 +1095,43 @@ function openMediaViewer(src, { videoId='', creatorId='', source='', title='', p
     const viewerId = getClientId();
     const threshold = 5; // seconds watched to count as valid view
     let counted = false;
+    let trackedImpression = false;
+    let lastWatchSentAt = 0;
     const onTime = () => {
       try {
+        if (!trackedImpression) {
+          trackedImpression = true;
+          trackSmartReach('impression');
+        }
+        if (videoEl.currentTime > 0) {
+          const now = Date.now();
+          if (!lastWatchSentAt) lastWatchSentAt = now;
+          const elapsed = now - lastWatchSentAt;
+          if (elapsed >= 7000) {
+            trackSmartReach('watch_time', { watchTimeMs: elapsed });
+            lastWatchSentAt = now;
+          }
+        }
         if (counted) return;
         if (videoEl.currentTime >= threshold) {
           counted = true;
           recordView(String(videoId||''), String(creatorId||''), String(viewerId||'anonymous'));
           // also send to server
           sendViewToServer(String(videoId||''), String(creatorId||''), String(viewerId||'anonymous'));
+          trackSmartReach('view');
         }
       } catch(e){}
     };
     videoEl.addEventListener('timeupdate', onTime);
-    videoEl.addEventListener('ended', ()=>{ if (!counted && videoEl.duration >= threshold) { counted = true; recordView(String(videoId||''), String(creatorId||''), String(viewerId||'anonymous')); sendViewToServer(String(videoId||''), String(creatorId||''), String(viewerId||'anonymous')); } });
+    videoEl.addEventListener('ended', ()=>{
+      if (!counted && videoEl.duration >= threshold) {
+        counted = true;
+        recordView(String(videoId||''), String(creatorId||''), String(viewerId||'anonymous'));
+        sendViewToServer(String(videoId||''), String(creatorId||''), String(viewerId||'anonymous'));
+        trackSmartReach('view');
+      }
+      trackSmartReach('completion');
+    });
 
     // load on demand: clicking play loads preview first (if provided) then upgrades to stream/adaptive
     playBtn.addEventListener('click', async ()=>{
@@ -954,7 +1194,14 @@ function openMediaViewer(src, { videoId='', creatorId='', source='', title='', p
       playOverlay.remove();
     });
 
-    closeBtn.addEventListener('click', ()=>{ try{ videoEl.pause(); videoEl.removeEventListener('timeupdate', onTime); document.body.removeChild(root);}catch(e){} });
+    closeBtn.addEventListener('click', ()=>{
+      try {
+        if (!counted && videoEl.currentTime > 0 && videoEl.currentTime < threshold) trackSmartReach('skip');
+        videoEl.pause();
+        videoEl.removeEventListener('timeupdate', onTime);
+        document.body.removeChild(root);
+      } catch(e) {}
+    });
   } else {
     // fallback: show as image or link
     const img = document.createElement('img'); img.src = src; img.style.maxWidth='100%'; mediaWrapper.appendChild(img); panel.appendChild(mediaWrapper); const closeBtn = document.createElement('button'); closeBtn.textContent='Close'; closeBtn.style.marginTop='0.5rem'; panel.appendChild(closeBtn); root.appendChild(panel); document.body.appendChild(root); closeBtn.addEventListener('click', ()=>{ try{ document.body.removeChild(root);}catch(e){} });
@@ -975,7 +1222,7 @@ function openMarketplaceEditor(id) {
   const item = items.find(i=>i.id===id);
   if (!item) return;
   const modal = document.createElement('div'); modal.style.position='fixed'; modal.style.inset='0'; modal.style.background='rgba(0,0,0,0.4)'; modal.style.display='flex'; modal.style.alignItems='center'; modal.style.justifyContent='center'; modal.style.zIndex='9999';
-  const panel = document.createElement('div'); panel.style.background='rgba(13,26,46,0.98)'; panel.style.padding='1rem'; panel.style.borderRadius='8px'; panel.style.width='min(720px,95%)'; panel.style.maxHeight='85%'; panel.style.overflow='auto';
+  const panel = document.createElement('div'); panel.style.background='rgba(13,26,46,0.98)'; panel.style.color='#fff'; panel.style.padding='1rem'; panel.style.borderRadius='8px'; panel.style.width='min(720px,95%)'; panel.style.maxHeight='85%'; panel.style.overflow='auto';
   panel.innerHTML = `
     <h3>Edit Listing</h3>
     <label>Item name</label><input class="modal-item-name" value="${item.name}">
@@ -1155,6 +1402,1044 @@ function openConnectDashboard() {
 // wire Connect button
 try { const btn = document.getElementById('open-connect-btn'); if (btn) btn.addEventListener('click', ()=>openConnectDashboard()); } catch(e){}
 
+// --- AFRIQORA Settings UI ---
+const APP_SETTINGS_STORAGE_KEY = 'afriqoraAppSettingsV1';
+let settingsSyncTimer = null;
+let settingsSyncInFlight = false;
+let settingsLastSyncedKey = '';
+const SETTINGS_SECTIONS = [
+  { id: 'privacy-security', title: 'Privacy & Security', description: 'Manage account protections and visibility.' },
+  { id: 'notifications', title: 'Notifications', description: 'Control alerts for account, creator, and system activity.' },
+  { id: 'afriqora-ai', title: 'AFRIQORA AI', description: 'Tune AI suggestions, summaries, and recommendations.' },
+  { id: 'voice', title: 'Voice', description: 'Choose voice defaults for calls and voice interactions.' },
+  { id: 'search', title: 'Search', description: 'Customize search behavior and ranking preferences.' },
+  { id: 'account', title: 'Account', description: 'Review account identity and connected access.' },
+  { id: 'appearance', title: 'Appearance', description: 'Set theme and display density preferences.' },
+  { id: 'language-region', title: 'Language & Region', description: 'Pick language, timezone, and regional formatting.' },
+  { id: 'payments-subscriptions', title: 'Payments & Subscriptions', description: 'Configure billing preferences and invoice options.' },
+  { id: 'safety', title: 'Safety', description: 'Set filters, reporting defaults, and protection features.' },
+  { id: 'help-support', title: 'Help & Support', description: 'Access support channels and diagnostics.' },
+  { id: 'about-afriqora', title: 'About AFRIQORA', description: 'Product version, legal notes, and platform details.' }
+];
+const SETTINGS_SECTION_ICONS = {
+  'privacy-security': 'shield',
+  notifications: 'bell',
+  'afriqora-ai': 'spark',
+  voice: 'mic',
+  search: 'search',
+  account: 'user',
+  appearance: 'palette',
+  'language-region': 'globe',
+  'payments-subscriptions': 'wallet',
+  safety: 'lock',
+  'help-support': 'help',
+  'about-afriqora': 'info'
+};
+
+function ensureSettingsStyles() {
+  if (document.getElementById('afriqora-settings-style')) return;
+  const style = document.createElement('style');
+  style.id = 'afriqora-settings-style';
+  style.textContent = `
+    .af-settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 12% 14%, rgba(52, 211, 153, 0.12), transparent 36%), radial-gradient(circle at 88% 20%, rgba(14, 165, 233, 0.14), transparent 42%), rgba(2, 10, 20, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000000;
+      padding: 1rem;
+    }
+    .af-settings-panel {
+      width: min(1120px, 100%);
+      max-height: 94vh;
+      overflow: hidden;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(158deg, #08172a 0%, #0e2643 48%, #103256 100%);
+      color: #f7fbff;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+    }
+    .af-settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(120deg, rgba(8, 18, 34, 0.84), rgba(11, 27, 48, 0.52));
+      gap: 0.8rem;
+    }
+    .af-settings-title {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
+    }
+    .af-settings-subtitle {
+      margin: 0.15rem 0 0;
+      color: rgba(230, 242, 255, 0.74);
+      font-size: 0.88rem;
+      line-height: 1.35;
+    }
+    .af-settings-header-left {
+      min-width: 0;
+    }
+    .af-settings-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-shrink: 0;
+    }
+    .af-settings-sync-pill {
+      border: 1px solid rgba(110, 231, 183, 0.45);
+      background: rgba(52, 211, 153, 0.15);
+      color: #d8fff0;
+      border-radius: 999px;
+      padding: 0.22rem 0.58rem;
+      font-size: 0.74rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .af-settings-close {
+      border: 1px solid rgba(255,255,255,0.22);
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.5rem 0.8rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .af-settings-close:hover,
+    .af-settings-close:focus-visible {
+      background: rgba(255,255,255,0.18);
+      outline: none;
+    }
+    .af-settings-layout {
+      display: grid;
+      grid-template-columns: minmax(250px, 330px) 1fr;
+      min-height: 0;
+      flex: 1;
+    }
+    .af-settings-nav {
+      border-right: 1px solid rgba(255,255,255,0.1);
+      overflow: auto;
+      padding: 0.8rem 0.75rem;
+      background: rgba(9, 20, 37, 0.45);
+    }
+    .af-settings-nav-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(255,255,255,0.03);
+      color: #eff7ff;
+      border-radius: 14px;
+      padding: 0.78rem 0.76rem;
+      cursor: pointer;
+      margin: 0 0 0.55rem;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.65rem;
+      align-items: start;
+    }
+    .af-settings-nav-btn:hover,
+    .af-settings-nav-btn:focus-visible {
+      border-color: rgba(101, 201, 255, 0.65);
+      background: rgba(56, 189, 248, 0.17);
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .af-settings-nav-btn.active {
+      border-color: rgba(110, 231, 183, 0.9);
+      background: linear-gradient(120deg, rgba(52, 211, 153, 0.24), rgba(14, 165, 233, 0.24));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    .af-settings-nav-icon {
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 0.5rem;
+      background: rgba(255,255,255,0.11);
+      border: 1px solid rgba(255,255,255,0.2);
+      display: inline-grid;
+      place-items: center;
+      margin-top: 0.05rem;
+    }
+    .af-settings-nav-icon svg {
+      width: 0.95rem;
+      height: 0.95rem;
+      stroke: #dff4ff;
+    }
+    .af-settings-nav-title {
+      display: block;
+      font-weight: 700;
+      font-size: 0.93rem;
+      margin-bottom: 0.14rem;
+      letter-spacing: 0.01em;
+    }
+    .af-settings-nav-desc {
+      display: block;
+      color: rgba(227, 238, 251, 0.75);
+      font-size: 0.78rem;
+      line-height: 1.3;
+    }
+    .af-settings-content {
+      overflow: auto;
+      padding: 1rem 1.05rem 1.1rem;
+      min-height: 0;
+    }
+    .af-settings-loading {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      background: rgba(7, 17, 31, 0.52);
+      padding: 1rem;
+      display: grid;
+      gap: 0.55rem;
+    }
+    .af-settings-loading-line {
+      height: 0.85rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.16), rgba(255,255,255,0.08));
+      background-size: 200% 100%;
+      animation: afSettingsPulse 1.3s linear infinite;
+    }
+    .af-settings-loading-line.short { width: 46%; }
+    .af-settings-loading-line.mid { width: 65%; }
+    @keyframes afSettingsPulse {
+      from { background-position: 100% 0; }
+      to { background-position: -100% 0; }
+    }
+    .af-settings-screen {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(7, 17, 31, 0.62), rgba(8, 22, 40, 0.52));
+      padding: 1rem 1rem 1.08rem;
+    }
+    .af-settings-screen-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .af-settings-screen-icon {
+      width: 1.9rem;
+      height: 1.9rem;
+      border-radius: 0.56rem;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid rgba(110, 231, 183, 0.45);
+      background: rgba(52, 211, 153, 0.14);
+      flex-shrink: 0;
+    }
+    .af-settings-screen-icon svg {
+      width: 1rem;
+      height: 1rem;
+      stroke: #b8ffe7;
+    }
+    .af-settings-screen h4 {
+      margin: 0 0 0.35rem;
+      font-size: 1.12rem;
+      letter-spacing: 0.01em;
+    }
+    .af-settings-screen-intro {
+      margin: 0 0 1rem;
+      color: rgba(229, 241, 255, 0.78);
+      font-size: 0.9rem;
+    }
+    .af-settings-group {
+      border-top: 1px solid rgba(255,255,255,0.11);
+      padding-top: 0.9rem;
+      margin-top: 0.9rem;
+      display: grid;
+      gap: 0.72rem;
+    }
+    .af-setting-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px);
+      gap: 0.9rem;
+      align-items: center;
+    }
+    .af-setting-row label {
+      font-weight: 600;
+      font-size: 0.91rem;
+      display: block;
+      margin-bottom: 0.18rem;
+    }
+    .af-setting-help {
+      margin: 0;
+      color: rgba(219, 235, 255, 0.7);
+      font-size: 0.81rem;
+      line-height: 1.35;
+    }
+    .af-settings-input,
+    .af-settings-select,
+    .af-settings-textarea {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 0.55rem 0.65rem;
+      font-size: 0.9rem;
+    }
+    .af-settings-input::placeholder,
+    .af-settings-textarea::placeholder {
+      color: rgba(223, 235, 252, 0.56);
+    }
+    .af-settings-input:focus,
+    .af-settings-select:focus,
+    .af-settings-textarea:focus {
+      outline: none;
+      border-color: rgba(56, 189, 248, 0.92);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+    .af-settings-input[type='range'] {
+      padding: 0;
+    }
+    .af-settings-toggle {
+      width: 1.05rem;
+      height: 1.05rem;
+      accent-color: #34d399;
+    }
+    .af-settings-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 0.5rem;
+    }
+    .af-settings-btn {
+      border: 1px solid rgba(110, 231, 183, 0.65);
+      background: linear-gradient(120deg, rgba(52, 211, 153, 0.2), rgba(56, 189, 248, 0.18));
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.49rem 0.76rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .af-settings-btn:hover,
+    .af-settings-btn:focus-visible {
+      outline: none;
+      border-color: rgba(125, 240, 195, 0.9);
+      background: linear-gradient(120deg, rgba(52, 211, 153, 0.3), rgba(56, 189, 248, 0.24));
+    }
+    .af-settings-note {
+      border-left: 3px solid rgba(56, 189, 248, 0.9);
+      background: rgba(56, 189, 248, 0.12);
+      padding: 0.6rem 0.7rem;
+      border-radius: 8px;
+      color: rgba(237, 247, 255, 0.95);
+      font-size: 0.84rem;
+      margin-top: 0.65rem;
+    }
+    .af-settings-mobile-back {
+      display: none;
+      margin-bottom: 0.7rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.45rem 0.66rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .af-settings-mobile-back:hover,
+    .af-settings-mobile-back:focus-visible {
+      outline: none;
+      background: rgba(255,255,255,0.15);
+    }
+    .af-settings-footer {
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding: 0.6rem 0.95rem;
+      font-size: 0.79rem;
+      color: rgba(216, 233, 251, 0.76);
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .af-settings-save-state {
+      padding: 0.08rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .af-settings-save-state.info {
+      color: #dbf2ff;
+      border-color: rgba(56, 189, 248, 0.5);
+      background: rgba(56, 189, 248, 0.16);
+    }
+    .af-settings-save-state.success {
+      color: #d9ffe8;
+      border-color: rgba(52, 211, 153, 0.6);
+      background: rgba(52, 211, 153, 0.18);
+    }
+    .af-settings-save-state.error {
+      color: #ffe2e8;
+      border-color: rgba(244, 63, 94, 0.55);
+      background: rgba(244, 63, 94, 0.18);
+    }
+    @media (max-width: 900px) {
+      .af-settings-layout {
+        grid-template-columns: 1fr;
+      }
+      .af-settings-nav {
+        border-right: 0;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+      .af-setting-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 720px) {
+      .af-settings-panel {
+        border-radius: 12px;
+      }
+      .af-settings-nav.mobile-hidden {
+        display: none;
+      }
+      .af-settings-content.mobile-hidden {
+        display: none;
+      }
+      .af-settings-mobile-back {
+        display: inline-flex;
+      }
+      .af-settings-content {
+        padding: 0.8rem;
+      }
+      .af-settings-header {
+        padding: 0.75rem;
+      }
+      .af-settings-header-right {
+        gap: 0.4rem;
+      }
+      .af-settings-sync-pill {
+        display: none;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .af-settings-nav-btn,
+      .af-settings-save-state,
+      .af-settings-btn,
+      .af-settings-close {
+        transition: none;
+      }
+      .af-settings-loading-line {
+        animation: none;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function settingsIconSvg(icon) {
+  const map = {
+    shield: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-2.6 7.9-7 9-4.4-1.1-7-4.5-7-9V6l7-3z"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1112 0v4l2 3H4l2-3V9"/><path d="M10 19a2 2 0 004 0"/></svg>',
+    spark: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9L12 3z"/><path d="M5 17l.8 1.6L7.4 19l-1.6.8L5 21l-.8-1.2L2.6 19l1.6-.4L5 17z"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0"/><path d="M12 18v3"/><path d="M9 21h6"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>',
+    palette: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a8 8 0 100 16h1a3 3 0 000-6h-1a2 2 0 110-4h1"/><circle cx="7.5" cy="10" r="1"/><circle cx="9" cy="7" r="1"/><circle cx="13" cy="7" r="1"/></svg>',
+    globe: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18"/><path d="M12 3a15 15 0 000 18"/></svg>',
+    wallet: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M16 11h5"/><circle cx="16" cy="13" r="1"/><path d="M5 7V5h13"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 118 0v3"/></svg>',
+    help: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9a2.8 2.8 0 115 1.4c0 2-2.2 2.2-2.2 4"/><circle cx="12" cy="17" r=".8"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".8"/></svg>'
+  };
+  return map[icon] || map.info;
+}
+
+function settingsSectionTitleHtml(section, titleOverride) {
+  const iconKey = SETTINGS_SECTION_ICONS[section.id] || 'info';
+  const title = titleOverride || section.title;
+  return `
+    <div class="af-settings-screen-head">
+      <span class="af-settings-screen-icon" aria-hidden="true">${settingsIconSvg(iconKey)}</span>
+      <h4>${escapeHtml(title)}</h4>
+    </div>
+  `;
+}
+
+function deepMergeSettings(defaults, incoming) {
+  const output = Array.isArray(defaults) ? defaults.slice() : Object.assign({}, defaults);
+  Object.keys(output).forEach((key) => {
+    const dv = output[key];
+    const iv = incoming && Object.prototype.hasOwnProperty.call(incoming, key) ? incoming[key] : undefined;
+    if (dv && typeof dv === 'object' && !Array.isArray(dv)) {
+      output[key] = deepMergeSettings(dv, iv || {});
+    } else if (typeof iv !== 'undefined') {
+      output[key] = iv;
+    }
+  });
+  return output;
+}
+
+function getDefaultAppSettings() {
+  return {
+    privacy: { twoFactor: false, profileVisibility: 'public', sessionTimeout: '30m', locationSharing: false },
+    notifications: { email: true, push: true, creatorActivity: true, securityAlerts: true, digestFrequency: 'daily' },
+    ai: { assistantEnabled: true, summaryTone: 'balanced', smartCompose: true, recommendationLevel: 65 },
+    voice: { preferredVoice: 'neutral', autoNoiseReduction: true, autoCaption: true, micSensitivity: 55 },
+    search: { safeSearch: true, includeMarketplace: true, includeServices: true, resultDensity: 'comfortable', preferredSort: 'relevance' },
+    account: { loginAlerts: true, shareUsageInsights: false },
+    appearance: { theme: 'system', compactMode: false, reduceMotion: false },
+    languageRegion: { language: 'en', country: detectUserCountry() || 'ZA', timezone: 'Africa/Johannesburg', dateFormat: 'dd/mm/yyyy' },
+    payments: { defaultCurrency: 'ZAR', autoRenew: true, invoiceEmail: '', planTier: 'starter' },
+    safety: { blurSensitiveMedia: true, dmFilterLevel: 'medium', contentReview: true },
+    help: { diagnostics: false, contactChannel: 'email' },
+    about: { releaseChannel: 'stable', telemetryNoticeSeen: false }
+  };
+}
+
+function loadAppSettings() {
+  const defaults = getDefaultAppSettings();
+  try {
+    const raw = localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return deepMergeSettings(defaults, parsed || {});
+  } catch (e) {
+    return defaults;
+  }
+}
+
+function saveAppSettings(state) {
+  try {
+    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+function replaceSettingsState(target, nextState) {
+  Object.keys(target).forEach((k) => { delete target[k]; });
+  Object.keys(nextState || {}).forEach((k) => { target[k] = nextState[k]; });
+}
+
+function settingsSyncKey(userId, settingsState) {
+  try {
+    return String(userId || '') + '|' + JSON.stringify(settingsState || {});
+  } catch (e) {
+    return String(userId || '') + '|fallback';
+  }
+}
+
+async function pullSettingsFromServer(user) {
+  if (!user || !user.id) return null;
+  try {
+    const res = await apiRequest('/settings/preferences', { method: 'GET' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.ok || !data.settings) return null;
+    return deepMergeSettings(getDefaultAppSettings(), data.settings);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function pushSettingsToServer(user, settingsState) {
+  if (!user || !user.id) return false;
+  const syncKey = settingsSyncKey(user.id, settingsState);
+  if (settingsLastSyncedKey === syncKey) return true;
+  if (settingsSyncInFlight) return false;
+  settingsSyncInFlight = true;
+  try {
+    const res = await apiRequest('/settings/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ settings: settingsState })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.ok || !data.settings) return false;
+    const merged = deepMergeSettings(getDefaultAppSettings(), data.settings);
+    saveAppSettings(merged);
+    settingsLastSyncedKey = settingsSyncKey(user.id, merged);
+    return true;
+  } catch (e) {
+    return false;
+  } finally {
+    settingsSyncInFlight = false;
+  }
+}
+
+function scheduleSettingsSync(user, settingsState, onStatus) {
+  if (settingsSyncTimer) clearTimeout(settingsSyncTimer);
+  settingsSyncTimer = setTimeout(async () => {
+    if (!user || !user.id) {
+      if (onStatus) onStatus('Saved locally', 'success');
+      return;
+    }
+    if (onStatus) onStatus('Syncing to account...', 'info');
+    const ok = await pushSettingsToServer(user, settingsState);
+    if (onStatus) onStatus(ok ? 'Saved to account' : 'Could not sync to account, saved locally', ok ? 'success' : 'error');
+  }, 350);
+}
+
+function getSettingValue(settings, path) {
+  return String(path || '').split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), settings);
+}
+
+function setSettingValue(settings, path, value) {
+  const parts = String(path || '').split('.');
+  let cursor = settings;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    if (!cursor[k] || typeof cursor[k] !== 'object') cursor[k] = {};
+    cursor = cursor[k];
+  }
+  cursor[parts[parts.length - 1]] = value;
+}
+
+function settingRowHtml({ label, help, controlHtml }) {
+  return `
+    <div class="af-setting-row">
+      <div>
+        <label>${escapeHtml(label)}</label>
+        <p class="af-setting-help">${escapeHtml(help || '')}</p>
+      </div>
+      <div>${controlHtml}</div>
+    </div>
+  `;
+}
+
+function openSettingsScreen() {
+  ensureSettingsStyles();
+  const existing = document.getElementById('afriqora-settings-overlay');
+  if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+  let selectedSectionId = SETTINGS_SECTIONS[0].id;
+  let mobileDetailMode = false;
+  const state = loadAppSettings();
+  let currentUser = null;
+  let diagnosticsResult = '';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'afriqora-settings-overlay';
+  overlay.className = 'af-settings-overlay';
+  const panel = document.createElement('section');
+  panel.className = 'af-settings-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', 'AFRIQORA Settings');
+  panel.setAttribute('tabindex', '-1');
+
+  panel.innerHTML = `
+    <header class="af-settings-header">
+      <div class="af-settings-header-left">
+        <h3 class="af-settings-title">AFRIQORA Settings</h3>
+        <p class="af-settings-subtitle">Control your platform experience, privacy, and account preferences.</p>
+      </div>
+      <div class="af-settings-header-right">
+        <span class="af-settings-sync-pill">Account-aware sync</span>
+        <button type="button" class="af-settings-close" aria-label="Close Settings">Close</button>
+      </div>
+    </header>
+    <div class="af-settings-layout">
+      <nav class="af-settings-nav" aria-label="Settings sections"></nav>
+      <div class="af-settings-content">
+        <div class="af-settings-loading" role="status" aria-live="polite">
+          <div class="af-settings-loading-line mid"></div>
+          <div class="af-settings-loading-line"></div>
+          <div class="af-settings-loading-line short"></div>
+        </div>
+      </div>
+    </div>
+    <footer class="af-settings-footer">
+      <span>AFRIQORA personalization settings are saved on this device.</span>
+      <span class="af-settings-save-state" aria-live="polite">Loading settings...</span>
+    </footer>
+  `;
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  const closeBtn = panel.querySelector('.af-settings-close');
+  const navEl = panel.querySelector('.af-settings-nav');
+  const contentEl = panel.querySelector('.af-settings-content');
+  const saveStateEl = panel.querySelector('.af-settings-save-state');
+  panel.focus();
+
+  function onDocumentKeyDown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSettings();
+    }
+  }
+
+  function closeSettings() {
+    document.removeEventListener('keydown', onDocumentKeyDown);
+    try { document.body.removeChild(overlay); } catch (e) {}
+  }
+
+  function updateSaveState(message, tone = 'success') {
+    if (!saveStateEl) return;
+    saveStateEl.textContent = message || 'All changes saved';
+    saveStateEl.classList.remove('info', 'success', 'error');
+    saveStateEl.classList.add(tone);
+    saveStateEl.style.opacity = '1';
+    if (message && message !== 'All changes saved' && tone !== 'error') {
+      setTimeout(() => {
+        saveStateEl.textContent = 'All changes saved';
+        saveStateEl.classList.remove('info', 'error');
+        saveStateEl.classList.add('success');
+      }, 1400);
+    }
+  }
+
+  function applyMobileLayout() {
+    const isMobile = window.matchMedia('(max-width: 720px)').matches;
+    if (!isMobile) {
+      navEl.classList.remove('mobile-hidden');
+      contentEl.classList.remove('mobile-hidden');
+      return;
+    }
+    if (mobileDetailMode) {
+      navEl.classList.add('mobile-hidden');
+      contentEl.classList.remove('mobile-hidden');
+    } else {
+      navEl.classList.remove('mobile-hidden');
+      contentEl.classList.add('mobile-hidden');
+    }
+  }
+
+  function bindControlEvents(container) {
+    container.querySelectorAll('[data-setting-path]').forEach((el) => {
+      const path = el.getAttribute('data-setting-path');
+      const type = el.getAttribute('data-setting-type') || 'text';
+      const eventName = (type === 'toggle' || type === 'range') ? 'input' : 'change';
+      el.addEventListener(eventName, () => {
+        let value;
+        if (type === 'toggle') value = !!el.checked;
+        else if (type === 'number') value = Number(el.value) || 0;
+        else if (type === 'range') value = Number(el.value) || 0;
+        else value = el.value;
+        setSettingValue(state, path, value);
+        saveAppSettings(state);
+        scheduleSettingsSync(currentUser, state, updateSaveState);
+        if (path === 'languageRegion.language') {
+          applyLanguageChange(value);
+        }
+        if (type === 'range') {
+          const badge = container.querySelector('[data-range-value="' + path + '"]');
+          if (badge) badge.textContent = String(value);
+        }
+        updateSaveState('Saved', 'success');
+      });
+    });
+
+    container.querySelectorAll('[data-settings-action]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const action = btn.getAttribute('data-settings-action');
+        if (action === 'open-account') {
+          closeSettings();
+          openAccountModal();
+          return;
+        }
+        if (action === 'open-dashboard') {
+          closeSettings();
+          const me = await fetchCurrentUser(true);
+          if (!me) openAccountModal();
+          else openCreatorDashboard();
+          return;
+        }
+        if (action === 'run-diagnostics') {
+          setSettingValue(state, 'help.diagnostics', true);
+          saveAppSettings(state);
+          scheduleSettingsSync(currentUser, state, updateSaveState);
+          updateSaveState('Running diagnostics...', 'info');
+          try {
+            const healthRes = await apiRequest('/health', { method: 'GET' });
+            const health = await healthRes.json().catch(() => null);
+            diagnosticsResult = healthRes.ok
+              ? ('API reachable. Server time: ' + new Date(health.now || Date.now()).toLocaleString())
+              : 'Diagnostics could not reach API health endpoint.';
+            updateSaveState(healthRes.ok ? 'Diagnostics completed' : 'Diagnostics finished with warnings', healthRes.ok ? 'success' : 'error');
+          } catch (err) {
+            diagnosticsResult = 'Diagnostics failed due to network or server connectivity issues.';
+            updateSaveState('Diagnostics failed', 'error');
+          }
+          renderContent();
+          return;
+        }
+        if (action === 'reset-defaults') {
+          const confirmed = confirm('Reset all AFRIQORA settings on this device?');
+          if (!confirmed) return;
+          const defaults = getDefaultAppSettings();
+          replaceSettingsState(state, defaults);
+          saveAppSettings(state);
+          scheduleSettingsSync(currentUser, state, updateSaveState);
+          renderContent();
+          updateSaveState('Settings reset', 'success');
+        }
+      });
+    });
+  }
+
+  function renderSectionContent(id) {
+    const me = currentUser;
+    const section = SETTINGS_SECTIONS.find((s) => s.id === id) || SETTINGS_SECTIONS[0];
+    if (id === 'privacy-security') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Protect your account and control how your profile appears across AFRIQORA.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Two-factor authentication', help: 'Require an extra verification step at login.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="privacy.twoFactor" data-setting-type="toggle" ${state.privacy.twoFactor ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Profile visibility', help: 'Choose who can see your profile details.', controlHtml: `<select class="af-settings-select" data-setting-path="privacy.profileVisibility"><option value="public" ${state.privacy.profileVisibility === 'public' ? 'selected' : ''}>Public</option><option value="community" ${state.privacy.profileVisibility === 'community' ? 'selected' : ''}>AFRIQORA Community</option><option value="private" ${state.privacy.profileVisibility === 'private' ? 'selected' : ''}>Only me</option></select>` })}
+            ${settingRowHtml({ label: 'Session timeout', help: 'Automatic sign-out period for inactive sessions.', controlHtml: `<select class="af-settings-select" data-setting-path="privacy.sessionTimeout"><option value="15m" ${state.privacy.sessionTimeout === '15m' ? 'selected' : ''}>15 minutes</option><option value="30m" ${state.privacy.sessionTimeout === '30m' ? 'selected' : ''}>30 minutes</option><option value="2h" ${state.privacy.sessionTimeout === '2h' ? 'selected' : ''}>2 hours</option><option value="never" ${state.privacy.sessionTimeout === 'never' ? 'selected' : ''}>Never on this device</option></select>` })}
+            ${settingRowHtml({ label: 'Location sharing', help: 'Allow location hints for local business and services suggestions.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="privacy.locationSharing" data-setting-type="toggle" ${state.privacy.locationSharing ? 'checked' : ''}>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'notifications') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Choose when AFRIQORA should notify you across account and creator workflows.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Email notifications', help: 'Receive account and platform updates by email.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="notifications.email" data-setting-type="toggle" ${state.notifications.email ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Push notifications', help: 'Show in-browser alerts for live activity.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="notifications.push" data-setting-type="toggle" ${state.notifications.push ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Creator activity alerts', help: 'Get notified for views, likes, and comments on your posts.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="notifications.creatorActivity" data-setting-type="toggle" ${state.notifications.creatorActivity ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Security alerts', help: 'Critical notifications for login changes and suspicious activity.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="notifications.securityAlerts" data-setting-type="toggle" ${state.notifications.securityAlerts ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Digest frequency', help: 'Summary cadence for marketplace and business insights.', controlHtml: `<select class="af-settings-select" data-setting-path="notifications.digestFrequency"><option value="realtime" ${state.notifications.digestFrequency === 'realtime' ? 'selected' : ''}>Realtime</option><option value="daily" ${state.notifications.digestFrequency === 'daily' ? 'selected' : ''}>Daily</option><option value="weekly" ${state.notifications.digestFrequency === 'weekly' ? 'selected' : ''}>Weekly</option></select>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'afriqora-ai') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Personalize AFRIQORA AI behavior for smarter business and creator support.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Enable AFRIQORA AI assistant', help: 'Allow AI suggestions in dashboard and content tools.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="ai.assistantEnabled" data-setting-type="toggle" ${state.ai.assistantEnabled ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Summary tone', help: 'Preferred style for generated summaries and recommendations.', controlHtml: `<select class="af-settings-select" data-setting-path="ai.summaryTone"><option value="brief" ${state.ai.summaryTone === 'brief' ? 'selected' : ''}>Brief</option><option value="balanced" ${state.ai.summaryTone === 'balanced' ? 'selected' : ''}>Balanced</option><option value="detailed" ${state.ai.summaryTone === 'detailed' ? 'selected' : ''}>Detailed</option></select>` })}
+            ${settingRowHtml({ label: 'Smart compose', help: 'Assist with post writing and business descriptions.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="ai.smartCompose" data-setting-type="toggle" ${state.ai.smartCompose ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Recommendation intensity', help: 'How proactive AFRIQORA AI should be in recommendations.', controlHtml: `<div><input class="af-settings-input" type="range" min="0" max="100" value="${Number(state.ai.recommendationLevel || 0)}" data-setting-path="ai.recommendationLevel" data-setting-type="range"><p class="af-setting-help">Current level: <strong data-range-value="ai.recommendationLevel">${Number(state.ai.recommendationLevel || 0)}</strong></p></div>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'voice') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Control voice quality preferences for calling and voice-enabled workflows.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Preferred voice profile', help: 'Default voice style for supported interactions.', controlHtml: `<select class="af-settings-select" data-setting-path="voice.preferredVoice"><option value="neutral" ${state.voice.preferredVoice === 'neutral' ? 'selected' : ''}>Neutral</option><option value="warm" ${state.voice.preferredVoice === 'warm' ? 'selected' : ''}>Warm</option><option value="energetic" ${state.voice.preferredVoice === 'energetic' ? 'selected' : ''}>Energetic</option></select>` })}
+            ${settingRowHtml({ label: 'Automatic noise reduction', help: 'Reduce background sounds during voice sessions.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="voice.autoNoiseReduction" data-setting-type="toggle" ${state.voice.autoNoiseReduction ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Live captions', help: 'Enable captions for supported voice conversations.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="voice.autoCaption" data-setting-type="toggle" ${state.voice.autoCaption ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Microphone sensitivity', help: 'Tune voice capture sensitivity.', controlHtml: `<div><input class="af-settings-input" type="range" min="0" max="100" value="${Number(state.voice.micSensitivity || 0)}" data-setting-path="voice.micSensitivity" data-setting-type="range"><p class="af-setting-help">Current level: <strong data-range-value="voice.micSensitivity">${Number(state.voice.micSensitivity || 0)}</strong></p></div>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'search') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Adjust relevance and discoverability for business, services, and marketplace results.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Safe Search', help: 'Filter potentially sensitive search results.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="search.safeSearch" data-setting-type="toggle" ${state.search.safeSearch ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Include marketplace', help: 'Include product listings in universal search.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="search.includeMarketplace" data-setting-type="toggle" ${state.search.includeMarketplace ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Include services', help: 'Include service provider matches in universal search.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="search.includeServices" data-setting-type="toggle" ${state.search.includeServices ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Result density', help: 'Set card spacing for search and listing pages.', controlHtml: `<select class="af-settings-select" data-setting-path="search.resultDensity"><option value="compact" ${state.search.resultDensity === 'compact' ? 'selected' : ''}>Compact</option><option value="comfortable" ${state.search.resultDensity === 'comfortable' ? 'selected' : ''}>Comfortable</option><option value="expanded" ${state.search.resultDensity === 'expanded' ? 'selected' : ''}>Expanded</option></select>` })}
+            ${settingRowHtml({ label: 'Default sort', help: 'Initial ordering for broad search results.', controlHtml: `<select class="af-settings-select" data-setting-path="search.preferredSort"><option value="relevance" ${state.search.preferredSort === 'relevance' ? 'selected' : ''}>Relevance</option><option value="latest" ${state.search.preferredSort === 'latest' ? 'selected' : ''}>Latest</option><option value="popular" ${state.search.preferredSort === 'popular' ? 'selected' : ''}>Most popular</option></select>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'account') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Manage identity, sign-in preferences, and account-level actions.</p>
+          <div class="af-settings-group">
+            <div class="af-setting-row">
+              <div>
+                <label>Signed in account</label>
+                <p class="af-setting-help">Current AFRIQORA identity from your active session.</p>
+              </div>
+              <div>
+                <p style="margin:0 0 0.2rem;"><strong>${escapeHtml((me && me.displayName) || 'Guest')}</strong></p>
+                <p style="margin:0 0 0.2rem;" class="af-setting-help">${escapeHtml((me && me.email) || 'Not signed in')}</p>
+                <p style="margin:0;" class="af-setting-help">${escapeHtml((me && me.afriqoraId) ? ('AFRIQORA ID: ' + me.afriqoraId) : '')}</p>
+              </div>
+            </div>
+            ${settingRowHtml({ label: 'Login alerts', help: 'Notify me whenever a new sign-in is detected.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="account.loginAlerts" data-setting-type="toggle" ${state.account.loginAlerts ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Share usage insights', help: 'Help improve AFRIQORA features with anonymized activity insights.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="account.shareUsageInsights" data-setting-type="toggle" ${state.account.shareUsageInsights ? 'checked' : ''}>` })}
+            <div class="af-settings-actions">
+              <button type="button" class="af-settings-btn" data-settings-action="open-account">Open Account Center</button>
+              <button type="button" class="af-settings-btn" data-settings-action="open-dashboard">Open Creator Dashboard</button>
+            </div>
+          </div>
+        </div>`;
+    }
+    if (id === 'appearance') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Adjust visual style and readability to match your working preference.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Theme', help: 'Choose how AFRIQORA appears on this device.', controlHtml: `<select class="af-settings-select" data-setting-path="appearance.theme"><option value="system" ${state.appearance.theme === 'system' ? 'selected' : ''}>Use system</option><option value="dark" ${state.appearance.theme === 'dark' ? 'selected' : ''}>Dark</option><option value="light" ${state.appearance.theme === 'light' ? 'selected' : ''}>Light</option></select>` })}
+            ${settingRowHtml({ label: 'Compact mode', help: 'Reduce spacing to show more content per screen.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="appearance.compactMode" data-setting-type="toggle" ${state.appearance.compactMode ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Reduce motion', help: 'Lower animations for comfort and accessibility.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="appearance.reduceMotion" data-setting-type="toggle" ${state.appearance.reduceMotion ? 'checked' : ''}>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'language-region') {
+      const countryOptions = AFRICAN_COUNTRIES.map((c) => `<option value="${escapeHtml(c.code)}" ${state.languageRegion.country === c.code ? 'selected' : ''}>${escapeHtml(c.name)} (${escapeHtml(c.code)})</option>`).join('');
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Set language, region, timezone, and format defaults used across AFRIQORA.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Language', help: 'Primary interface language.', controlHtml: `<select class="af-settings-select" data-setting-path="languageRegion.language"><option value="en" ${state.languageRegion.language === 'en' ? 'selected' : ''}>English</option><option value="fr" ${state.languageRegion.language === 'fr' ? 'selected' : ''}>French</option><option value="sw" ${state.languageRegion.language === 'sw' ? 'selected' : ''}>Swahili</option><option value="pt" ${state.languageRegion.language === 'pt' ? 'selected' : ''}>Portuguese</option></select>` })}
+            ${settingRowHtml({ label: 'Region', help: 'Country for localized suggestions and formats.', controlHtml: `<select class="af-settings-select" data-setting-path="languageRegion.country">${countryOptions}</select>` })}
+            ${settingRowHtml({ label: 'Timezone', help: 'Timezone used for dashboard and scheduling.', controlHtml: `<select class="af-settings-select" data-setting-path="languageRegion.timezone"><option value="Africa/Johannesburg" ${state.languageRegion.timezone === 'Africa/Johannesburg' ? 'selected' : ''}>Africa/Johannesburg</option><option value="Africa/Lagos" ${state.languageRegion.timezone === 'Africa/Lagos' ? 'selected' : ''}>Africa/Lagos</option><option value="Africa/Nairobi" ${state.languageRegion.timezone === 'Africa/Nairobi' ? 'selected' : ''}>Africa/Nairobi</option><option value="Africa/Cairo" ${state.languageRegion.timezone === 'Africa/Cairo' ? 'selected' : ''}>Africa/Cairo</option></select>` })}
+            ${settingRowHtml({ label: 'Date format', help: 'Preferred date presentation format.', controlHtml: `<select class="af-settings-select" data-setting-path="languageRegion.dateFormat"><option value="dd/mm/yyyy" ${state.languageRegion.dateFormat === 'dd/mm/yyyy' ? 'selected' : ''}>DD/MM/YYYY</option><option value="mm/dd/yyyy" ${state.languageRegion.dateFormat === 'mm/dd/yyyy' ? 'selected' : ''}>MM/DD/YYYY</option><option value="yyyy-mm-dd" ${state.languageRegion.dateFormat === 'yyyy-mm-dd' ? 'selected' : ''}>YYYY-MM-DD</option></select>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'payments-subscriptions') {
+      const currencies = [...new Set(AFRICAN_COUNTRIES.map((c) => c.currency))].map((cur) => `<option value="${escapeHtml(cur)}" ${state.payments.defaultCurrency === cur ? 'selected' : ''}>${escapeHtml(cur)}</option>`).join('');
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Set billing defaults for monetization and platform subscription preferences.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Plan tier', help: 'Current AFRIQORA access tier preference.', controlHtml: `<select class="af-settings-select" data-setting-path="payments.planTier"><option value="starter" ${state.payments.planTier === 'starter' ? 'selected' : ''}>Starter</option><option value="pro" ${state.payments.planTier === 'pro' ? 'selected' : ''}>Pro</option><option value="business" ${state.payments.planTier === 'business' ? 'selected' : ''}>Business</option></select>` })}
+            ${settingRowHtml({ label: 'Default currency', help: 'Used for displaying payment amounts and balances.', controlHtml: `<select class="af-settings-select" data-setting-path="payments.defaultCurrency">${currencies}</select>` })}
+            ${settingRowHtml({ label: 'Auto-renew subscription', help: 'Keep your selected plan active automatically.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="payments.autoRenew" data-setting-type="toggle" ${state.payments.autoRenew ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Invoice email', help: 'Billing notices and payment receipts.', controlHtml: `<input class="af-settings-input" type="email" data-setting-path="payments.invoiceEmail" value="${escapeHtml(state.payments.invoiceEmail || '')}" placeholder="name@company.com">` })}
+          </div>
+          <p class="af-settings-note">Financial transactions continue to follow existing AFRIQORA backend authorization rules.</p>
+        </div>`;
+    }
+    if (id === 'safety') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Set content and interaction protections to match your comfort level.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Blur sensitive media', help: 'Blur potentially sensitive images and videos by default.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="safety.blurSensitiveMedia" data-setting-type="toggle" ${state.safety.blurSensitiveMedia ? 'checked' : ''}>` })}
+            ${settingRowHtml({ label: 'Message filter level', help: 'Moderation strength for direct messages and comments.', controlHtml: `<select class="af-settings-select" data-setting-path="safety.dmFilterLevel"><option value="low" ${state.safety.dmFilterLevel === 'low' ? 'selected' : ''}>Low</option><option value="medium" ${state.safety.dmFilterLevel === 'medium' ? 'selected' : ''}>Medium</option><option value="high" ${state.safety.dmFilterLevel === 'high' ? 'selected' : ''}>High</option></select>` })}
+            ${settingRowHtml({ label: 'Creator content review', help: 'Apply extra checks before content is promoted broadly.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="safety.contentReview" data-setting-type="toggle" ${state.safety.contentReview ? 'checked' : ''}>` })}
+          </div>
+        </div>`;
+    }
+    if (id === 'help-support') {
+      return `
+        <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section)}
+          <p class="af-settings-screen-intro">Access support channels and run quick diagnostics for troubleshooting.</p>
+          <div class="af-settings-group">
+            ${settingRowHtml({ label: 'Preferred support channel', help: 'Channel AFRIQORA should prioritize for help responses.', controlHtml: `<select class="af-settings-select" data-setting-path="help.contactChannel"><option value="email" ${state.help.contactChannel === 'email' ? 'selected' : ''}>Email</option><option value="whatsapp" ${state.help.contactChannel === 'whatsapp' ? 'selected' : ''}>WhatsApp</option><option value="inapp" ${state.help.contactChannel === 'inapp' ? 'selected' : ''}>In-app inbox</option></select>` })}
+            ${settingRowHtml({ label: 'Share diagnostics', help: 'Include browser diagnostics in support requests.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="help.diagnostics" data-setting-type="toggle" ${state.help.diagnostics ? 'checked' : ''}>` })}
+            <div class="af-settings-actions">
+              <button type="button" class="af-settings-btn" data-settings-action="run-diagnostics">Run Quick Diagnostics</button>
+            </div>
+          </div>
+            ${diagnosticsResult ? `<p class="af-settings-note" role="status">${escapeHtml(diagnosticsResult)}</p>` : ''}
+          <p class="af-settings-note">For urgent account security issues, use Account or Privacy & Security sections first.</p>
+        </div>`;
+    }
+    return `
+      <div class="af-settings-screen">
+          ${settingsSectionTitleHtml(section, 'About AFRIQORA')}
+        <p class="af-settings-screen-intro">Product information, compliance notes, and release behavior.</p>
+        <div class="af-settings-group">
+          ${settingRowHtml({ label: 'Release channel', help: 'Choose feature rollout preference for this browser.', controlHtml: `<select class="af-settings-select" data-setting-path="about.releaseChannel"><option value="stable" ${state.about.releaseChannel === 'stable' ? 'selected' : ''}>Stable</option><option value="preview" ${state.about.releaseChannel === 'preview' ? 'selected' : ''}>Preview</option></select>` })}
+          ${settingRowHtml({ label: 'Telemetry notice acknowledged', help: 'Acknowledge AFRIQORA product analytics policy notice.', controlHtml: `<input class="af-settings-toggle" type="checkbox" data-setting-path="about.telemetryNoticeSeen" data-setting-type="toggle" ${state.about.telemetryNoticeSeen ? 'checked' : ''}>` })}
+          <div class="af-setting-row">
+            <div>
+              <label>Current app identity</label>
+              <p class="af-setting-help">The current brand and version context for this project.</p>
+            </div>
+            <div>
+              <p style="margin:0;"><strong>AFRIQORA</strong></p>
+              <p class="af-setting-help" style="margin:0.2rem 0 0;">Web App Build: Local Workspace</p>
+            </div>
+          </div>
+          <div class="af-settings-actions">
+            <button type="button" class="af-settings-btn" data-settings-action="reset-defaults">Reset Settings to Default</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderNav() {
+    navEl.innerHTML = SETTINGS_SECTIONS.map((section) => `
+      <button type="button" class="af-settings-nav-btn ${section.id === selectedSectionId ? 'active' : ''}" data-settings-section="${section.id}">
+        <span class="af-settings-nav-icon" aria-hidden="true">${settingsIconSvg(SETTINGS_SECTION_ICONS[section.id] || 'info')}</span>
+        <span>
+          <span class="af-settings-nav-title">${escapeHtml(section.title)}</span>
+          <span class="af-settings-nav-desc">${escapeHtml(section.description)}</span>
+        </span>
+      </button>
+    `).join('');
+
+    navEl.querySelectorAll('[data-settings-section]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        selectedSectionId = btn.getAttribute('data-settings-section') || SETTINGS_SECTIONS[0].id;
+        mobileDetailMode = true;
+        renderNav();
+        renderContent();
+      });
+    });
+  }
+
+  function renderContent() {
+    const current = SETTINGS_SECTIONS.find((s) => s.id === selectedSectionId) || SETTINGS_SECTIONS[0];
+    contentEl.innerHTML = `
+      <button type="button" class="af-settings-mobile-back">Back to sections</button>
+      ${renderSectionContent(current.id)}
+    `;
+    contentEl.querySelector('.af-settings-mobile-back').addEventListener('click', () => {
+      mobileDetailMode = false;
+      applyMobileLayout();
+    });
+    bindControlEvents(contentEl);
+    applyMobileLayout();
+  }
+
+  closeBtn.addEventListener('click', closeSettings);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSettings();
+  });
+  panel.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSettings();
+    }
+  });
+  document.addEventListener('keydown', onDocumentKeyDown);
+  window.addEventListener('resize', applyMobileLayout, { passive: true });
+  updateSaveState('Loading settings...', 'info');
+
+  fetchCurrentUser(false).then(async (user) => {
+    currentUser = user;
+    if (currentUser && currentUser.id) {
+      const remote = await pullSettingsFromServer(currentUser);
+      if (remote) {
+        replaceSettingsState(state, remote);
+        saveAppSettings(state);
+        settingsLastSyncedKey = settingsSyncKey(currentUser.id, state);
+      }
+    }
+    renderNav();
+    renderContent();
+    applyMobileLayout();
+    updateSaveState(currentUser && currentUser.id ? 'Loaded account settings' : 'Loaded local settings', 'success');
+  }).catch(() => {
+    currentUser = null;
+    renderNav();
+    renderContent();
+    applyMobileLayout();
+    updateSaveState('Loaded local settings', 'success');
+  });
+}
+
+try {
+  const settingsBtn = document.getElementById('open-settings-btn');
+  if (settingsBtn) settingsBtn.addEventListener('click', () => openSettingsScreen());
+} catch (e) {}
+
 // --- Authentication UI ---
 async function openAccountModal() {
   const me = await fetchCurrentUser(true);
@@ -1178,6 +2463,7 @@ async function openAccountModal() {
         <p><strong>Joined:</strong> ${escapeHtml(formatIsoDate(user.createdAt))}</p>
         <div style="display:flex;gap:0.5rem;">
           <button class="auth-open-dashboard">Open Creator Dashboard</button>
+          <button class="auth-open-settings">Settings</button>
           <button class="auth-logout">Logout</button>
         </div>
         <p class="auth-msg" style="color:var(--muted);"></p>
@@ -1185,15 +2471,22 @@ async function openAccountModal() {
     `;
     const logoutBtn = content.querySelector('.auth-logout');
     const dashboardBtn = content.querySelector('.auth-open-dashboard');
+    const settingsBtn = content.querySelector('.auth-open-settings');
     logoutBtn.addEventListener('click', async ()=>{
       await apiRequest('/auth/logout', { method:'POST' }).catch(()=>null);
       authUserCache = null;
+      // Clear native session token on logout
+      try { localStorage.removeItem('afriqoraSessionId'); } catch(e) {}
       await updateAccountUI();
       closeModal();
     });
     dashboardBtn.addEventListener('click', ()=>{
       closeModal();
       openCreatorDashboard();
+    });
+    settingsBtn.addEventListener('click', ()=>{
+      closeModal();
+      openSettingsScreen();
     });
   }
 
@@ -1216,6 +2509,10 @@ async function openAccountModal() {
         const j = await res.json().catch(()=>({ error:'network' }));
         if (j && j.ok && j.user) {
           authUserCache = j.user;
+          // On native apps, persist sessionId for Bearer token auth (no cookies in WebView)
+          if (j.sessionId && window.__afriqoraNative) {
+            try { localStorage.setItem('afriqoraSessionId', j.sessionId); } catch(e) {}
+          }
           await updateAccountUI();
           renderSignedIn(j.user);
         } else {
@@ -1235,6 +2532,10 @@ async function openAccountModal() {
         const j = await res.json().catch(()=>({ error:'network' }));
         if (j && j.ok && j.user) {
           authUserCache = j.user;
+          // On native apps, persist sessionId for Bearer token auth (no cookies in WebView)
+          if (j.sessionId && window.__afriqoraNative) {
+            try { localStorage.setItem('afriqoraSessionId', j.sessionId); } catch(e) {}
+          }
           await updateAccountUI();
           renderSignedIn(j.user);
         } else {
@@ -1288,7 +2589,7 @@ function openPostEditor(postId) {
   // reuse modal pattern
   const modal = document.createElement('div');
   modal.style.position='fixed'; modal.style.inset='0'; modal.style.background='rgba(0,0,0,0.4)'; modal.style.display='flex'; modal.style.alignItems='center'; modal.style.justifyContent='center'; modal.style.zIndex='9999';
-  const panel = document.createElement('div'); panel.style.background='rgba(13,26,46,0.98)'; panel.style.padding='1rem'; panel.style.borderRadius='8px'; panel.style.width='min(720px,95%)'; panel.style.maxHeight='85%'; panel.style.overflow='auto';
+  const panel = document.createElement('div'); panel.style.background='rgba(13,26,46,0.98)'; panel.style.color='#fff'; panel.style.padding='1rem'; panel.style.borderRadius='8px'; panel.style.width='min(720px,95%)'; panel.style.maxHeight='85%'; panel.style.overflow='auto';
   panel.innerHTML = `
     <h3>Edit Post</h3>
     <label>Title</label><input type="text" class="modal-post-title" value="${post.title}">
@@ -1594,6 +2895,7 @@ function openProfileEditor(listingId) {
 
   const panel = document.createElement('div');
   panel.style.background = 'rgba(13,26,46,0.98)';
+  panel.style.color = '#fff';
   panel.style.padding = '1rem';
   panel.style.borderRadius = '8px';
   panel.style.width = 'min(720px, 95%)';
@@ -2089,7 +3391,8 @@ populateCountrySelect(document.getElementById('marketplace-seller-country'), _de
 populateCurrencySelect(document.getElementById('marketplace-seller-currency'), _detectedCountry ? (getCountryByCode(_detectedCountry)||{}).currency : '');
 
 // -------------------- Calling (WebRTC + Signaling) --------------------
-const SIGNALING_SERVER_URL = (typeof SIGNALING_SERVER_URL !== 'undefined') ? SIGNALING_SERVER_URL : 'ws://localhost:8080';
+const SIGNALING_SERVER_URL = (typeof window !== 'undefined' && window.SIGNALING_SERVER_URL) ? window.SIGNALING_SERVER_URL : 'ws://localhost:8080';
+const SIGNALING_ALWAYS_ON = typeof window !== 'undefined' && (window.AFRIQORA_ENABLE_SIGNALING === true || String(window.AFRIQORA_ENABLE_SIGNALING || '').toLowerCase() === 'true');
 const CLIENT_ID_STORAGE_KEY = 'afriqoraClientId';
 
 function getClientId() {
@@ -2106,14 +3409,18 @@ function getClientId() {
 }
 
 class SignalingClient {
-  constructor(url, clientId) {
+  constructor(url, clientId, options = {}) {
     this.url = url;
     this.clientId = clientId;
+    this.options = Object.assign({ autoRetry: false, retryDelayMs: 2000 }, options || {});
     this.ws = null;
     this.onmessage = null;
+    this._retryTimer = null;
+    this._isDisposed = false;
     this._connect();
   }
   _connect() {
+    if (this._isDisposed) return;
     try {
       this.ws = new WebSocket(this.url);
       this.ws.addEventListener('open', ()=>{
@@ -2122,9 +3429,29 @@ class SignalingClient {
       this.ws.addEventListener('message', (ev)=>{
         try { const msg = JSON.parse(ev.data); if (this.onmessage) this.onmessage(msg); } catch(e){}
       });
-      this.ws.addEventListener('close', ()=>{ setTimeout(()=>this._connect(), 2000); });
+      this.ws.addEventListener('close', ()=>{
+        if (!this.options.autoRetry || this._isDisposed) return;
+        if (this._retryTimer) clearTimeout(this._retryTimer);
+        this._retryTimer = setTimeout(()=>this._connect(), Math.max(500, Number(this.options.retryDelayMs || 2000)));
+      });
       this.ws.addEventListener('error', ()=>{});
     } catch (e) {}
+  }
+  async waitForOpen(timeoutMs = 3500) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) return true;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    return !!(this.ws && this.ws.readyState === WebSocket.OPEN);
+  }
+  dispose() {
+    this._isDisposed = true;
+    if (this._retryTimer) {
+      clearTimeout(this._retryTimer);
+      this._retryTimer = null;
+    }
+    try { if (this.ws) this.ws.close(); } catch (e) {}
   }
   send(obj) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -2132,12 +3459,33 @@ class SignalingClient {
   }
 }
 
-const signalingClient = new SignalingClient(SIGNALING_SERVER_URL, getClientId());
+let signalingClient = null;
+
+function ensureSignalingClient(options = {}) {
+  const merged = Object.assign({ autoRetry: false }, options || {});
+  if (signalingClient) {
+    signalingClient.options = Object.assign({}, signalingClient.options || {}, merged);
+    return signalingClient;
+  }
+  try {
+    signalingClient = new SignalingClient(SIGNALING_SERVER_URL, getClientId(), merged);
+    signalingClient.onmessage = handleSignalingMessage;
+    return signalingClient;
+  } catch (e) {
+    return null;
+  }
+}
+
+if (SIGNALING_ALWAYS_ON) {
+  ensureSignalingClient({ autoRetry: true });
+}
 
 // bind this clientId to a business id when owner manages a profile
 function bindClientToBusiness(businessId) {
-  if (!signalingClient || !businessId) return;
-  signalingClient.send({ type: 'bind-business', clientId: getClientId(), businessId: String(businessId) });
+  if (!businessId || !SIGNALING_ALWAYS_ON) return;
+  const client = ensureSignalingClient({ autoRetry: true });
+  if (!client) return;
+  client.send({ type: 'bind-business', clientId: getClientId(), businessId: String(businessId) });
 }
 
 // Call state
@@ -2158,7 +3506,8 @@ function showIncomingCallPopup(fromName, fromId, kind, offer) {
   box.appendChild(panel); root.appendChild(box);
 
   declineBtn.addEventListener('click', ()=>{
-    signalingClient.send({ type:'call-decline', from:getClientId(), to:fromId });
+    const client = ensureSignalingClient({ autoRetry: true });
+    if (client) client.send({ type:'call-decline', from:getClientId(), to:fromId });
     root.innerHTML='';
   });
 
@@ -2169,14 +3518,18 @@ function showIncomingCallPopup(fromName, fromId, kind, offer) {
 }
 
 async function startCall(targetId, kind='audio') {
-  if (!signalingClient || !targetId) { alert('Signaling not available or target not provided'); return; }
+  if (!targetId) { alert('Signaling not available or target not provided'); return; }
+  const client = ensureSignalingClient({ autoRetry: true });
+  if (!client) { alert('Signaling is not available in this browser.'); return; }
+  const ready = await client.waitForOpen(3500);
+  if (!ready) { alert('Signaling service is unavailable. Start signaling-server.js to enable calling.'); return; }
   const clientId = getClientId();
   // get local media
   let constraints = { audio: true }; if (kind==='video') constraints.video = true;
   try {
     const localStream = await navigator.mediaDevices.getUserMedia(constraints);
     const pc = new RTCPeerConnection({ iceServers:[{ urls: 'stun:stun.l.google.com:19302' }] });
-    pc.onicecandidate = (e)=>{ if (e.candidate) signalingClient.send({ type:'ice', from:clientId, to: targetId, candidate: e.candidate }); };
+    pc.onicecandidate = (e)=>{ if (e.candidate) client.send({ type:'ice', from:clientId, to: targetId, candidate: e.candidate }); };
     const remoteStream = new MediaStream();
     pc.ontrack = (e)=>{ e.streams[0] && e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t)); };
     localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
@@ -2184,31 +3537,33 @@ async function startCall(targetId, kind='audio') {
     // save currentCall
     currentCall = { pc, localStream, remoteStream, targetId, kind, state:'calling' };
     renderActiveCallUI(currentCall, /*isCaller=*/true);
-    signalingClient.send({ type:'offer', from:clientId, to: targetId, kind, sdp: offer.sdp });
+    client.send({ type:'offer', from:clientId, to: targetId, kind, sdp: offer.sdp });
   } catch (err) {
     alert('Unable to access camera/microphone: ' + (err.message || err));
   }
 }
 
 async function acceptCall(fromId, kind='audio', offerSdp) {
+  const client = ensureSignalingClient({ autoRetry: true });
+  if (!client) return;
   const clientId = getClientId();
   try {
     const constraints = { audio: true }; if (kind==='video') constraints.video = true;
     const localStream = await navigator.mediaDevices.getUserMedia(constraints);
     const pc = new RTCPeerConnection({ iceServers:[{ urls: 'stun:stun.l.google.com:19302' }] });
-    pc.onicecandidate = (e)=>{ if (e.candidate) signalingClient.send({ type:'ice', from:clientId, to: fromId, candidate: e.candidate }); };
+    pc.onicecandidate = (e)=>{ if (e.candidate) client.send({ type:'ice', from:clientId, to: fromId, candidate: e.candidate }); };
     const remoteStream = new MediaStream();
     pc.ontrack = (e)=>{ e.streams[0] && e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t)); };
     localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
     const desc = { type: 'offer', sdp: offerSdp };
     await pc.setRemoteDescription(desc);
     const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-    signalingClient.send({ type:'answer', from:clientId, to: fromId, sdp: answer.sdp });
+    client.send({ type:'answer', from:clientId, to: fromId, sdp: answer.sdp });
     currentCall = { pc, localStream, remoteStream, targetId: fromId, kind, state:'connected' };
     renderActiveCallUI(currentCall, /*isCaller=*/false);
   } catch (err) {
     alert('Unable to access camera/microphone: ' + (err.message || err));
-    signalingClient.send({ type:'call-error', from: clientId, to: fromId, message: String(err) });
+    client.send({ type:'call-error', from: clientId, to: fromId, message: String(err) });
   }
 }
 
@@ -2339,7 +3694,7 @@ async function openCreatorDashboard() {
 
   const root = document.createElement('div'); root.style.position='fixed'; root.style.inset='0'; root.style.background='rgba(0,0,0,0.6)'; root.style.display='flex'; root.style.alignItems='center'; root.style.justifyContent='center'; root.style.zIndex='999999';
   const panel = document.createElement('div'); panel.style.background='#0d1a2e'; panel.style.color='#fff'; panel.style.padding='1rem'; panel.style.borderRadius='8px'; panel.style.width='min(980px,96%)'; panel.style.maxHeight='92%'; panel.style.overflow='auto';
-  panel.innerHTML = `<h3 style="margin-top:0;">AFRIQORA CREATOR DASHBOARD</h3><p style="margin-top:0;color:rgba(255,255,255,0.82);">Manage your creator identity, posts, and business profile.</p>`;
+  panel.innerHTML = `<h3 style="margin-top:0;">AFRIQORA BUSINESS DASHBOARD</h3><p style="margin-top:0;color:rgba(255,255,255,0.82);">Manage your business profile, direct contact info, and posts.</p>`;
 
   const stateBox = document.createElement('div');
   stateBox.style.padding = '0.75rem';
@@ -2354,6 +3709,7 @@ async function openCreatorDashboard() {
   createSection.innerHTML = `
     <h4>Create Post</h4>
     <div style="display:grid;gap:0.5rem;">
+      <select id="dash-post-business-select" style="display:none;"></select>
       <input id="dash-post-title" type="text" placeholder="Post title">
       <textarea id="dash-post-content" placeholder="Description/content"></textarea>
       <input id="dash-post-category" type="text" placeholder="Business/service category">
@@ -2383,20 +3739,62 @@ async function openCreatorDashboard() {
   businessSection.style.borderTop = '1px solid rgba(255,255,255,0.12)';
   businessSection.style.paddingTop = '0.75rem';
   businessSection.innerHTML = `
-    <h4>Business Profile</h4>
-    <div style="display:grid;gap:0.5rem;">
-      <input id="dash-biz-name" type="text" placeholder="Business name">
-      <input id="dash-biz-owner" type="text" placeholder="Owner / profile name">
-      <input id="dash-biz-category" type="text" placeholder="Category">
-      <input id="dash-biz-location" type="text" placeholder="Location">
-      <input id="dash-biz-website" type="text" placeholder="Website">
-      <input id="dash-biz-contact" type="text" placeholder="Contact">
-      <textarea id="dash-biz-description" placeholder="Description"></textarea>
-      <label>Logo upload (optional)</label>
-      <input id="dash-biz-logo" type="file" accept="image/*">
-      <div style="display:flex;gap:0.5rem;align-items:center;">
-        <button id="dash-biz-save" type="button">Save Business Profile</button>
-        <span id="dash-biz-msg" aria-live="polite" style="color:#9ad1ff;"></span>
+    <div id="biz-list-wrapper">
+      <h4>My Businesses</h4>
+      <div id="dash-biz-list"></div>
+      <button id="dash-biz-add" type="button" style="margin-top:0.5rem;">Add New Business</button>
+    </div>
+    <div id="biz-wizard-wrapper" style="display:none; margin-top:1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h4>Business Profile Wizard</h4>
+        <span id="biz-wizard-step-label" style="font-size:0.85rem; color:#9ad1ff;">Step 1 of 4</span>
+      </div>
+      
+      <div id="biz-step-1" class="biz-wizard-step" style="display:block; margin-top:0.5rem;">
+        <p style="font-size:0.85rem; margin-bottom:0.5rem;">${t('wizard.step1')}</p>
+        <input id="dash-biz-name" type="text" placeholder="Business Name">
+        <input id="dash-biz-owner" type="text" placeholder="Your Name / Title" style="margin-top:0.5rem;">
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+          <button class="biz-cancel" type="button" style="flex:1;">Cancel</button>
+          <button class="biz-next" data-next="2" style="flex:1;">${t('btn.next')}</button>
+        </div>
+      </div>
+      
+      <div id="biz-step-2" class="biz-wizard-step" style="display:none; margin-top:0.5rem;">
+        <p style="font-size:0.85rem; margin-bottom:0.5rem;">${t('wizard.step2')}</p>
+        <div id="dash-biz-categories-container" style="background:#fff; border-radius:4px; padding:0.25rem;"></div>
+        <div id="dash-biz-services-container" style="background:#fff; border-radius:4px; padding:0.25rem; margin-top:0.5rem;"></div>
+        <div id="dash-biz-languages-container" style="background:#fff; border-radius:4px; padding:0.25rem; margin-top:0.5rem;"></div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+          <button class="biz-prev" data-prev="1" style="flex:1;">${t('btn.back')}</button>
+          <button class="biz-next" data-next="3" style="flex:1;">${t('btn.next')}</button>
+        </div>
+      </div>
+      
+      <div id="biz-step-3" class="biz-wizard-step" style="display:none; margin-top:0.5rem;">
+        <p style="font-size:0.85rem; margin-bottom:0.5rem;">${t('wizard.step3')}</p>
+        <input id="dash-biz-country" type="text" placeholder="Country (e.g. South Africa)">
+        <input id="dash-biz-region" type="text" placeholder="Province/Region" style="margin-top:0.5rem;">
+        <input id="dash-biz-city" type="text" placeholder="City" style="margin-top:0.5rem;">
+        <input id="dash-biz-location" type="text" placeholder="Exact Location / Area" style="margin-top:0.5rem;">
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+          <button class="biz-prev" data-prev="2" style="flex:1;">${t('btn.back')}</button>
+          <button class="biz-next" data-next="4" style="flex:1;">${t('btn.next')}</button>
+        </div>
+      </div>
+
+      <div id="biz-step-4" class="biz-wizard-step" style="display:none; margin-top:0.5rem;">
+        <p style="font-size:0.85rem; margin-bottom:0.5rem;">${t('wizard.step4')}</p>
+        <input id="dash-biz-website" type="text" placeholder="Website URL">
+        <input id="dash-biz-contact" type="text" placeholder="Contact Phone/Email" style="margin-top:0.5rem;">
+        <textarea id="dash-biz-description" placeholder="Description" style="margin-top:0.5rem;"></textarea>
+        <label style="display:block; margin-top:0.5rem;">Logo upload (optional)</label>
+        <input id="dash-biz-logo" type="file" accept="image/*">
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center;">
+          <button class="biz-prev" data-prev="3" style="flex:1;">${t('btn.back')}</button>
+          <button id="dash-biz-save" type="button" style="flex:2; background:#9ad1ff; color:#000;">${t('btn.save')}</button>
+        </div>
+        <div id="dash-biz-msg" aria-live="polite" style="color:#9ad1ff; margin-top:0.5rem; text-align:center;"></div>
       </div>
     </div>
   `;
@@ -2418,6 +3816,10 @@ async function openCreatorDashboard() {
 
   let dashboardData = null;
   let editingPostId = null;
+  let editingBusinessId = null;
+  let selectedCategories = [];
+  let selectedServices = [];
+  let selectedLanguages = ['en'];
   let myPosts = [];
 
   function closeDashboard() {
@@ -2448,7 +3850,9 @@ async function openCreatorDashboard() {
       <div style="border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:0.6rem;margin-bottom:0.5rem;">
         <p style="margin:0;"><strong>${escapeHtml(p.title || '')}</strong></p>
         <p style="margin:0.25rem 0;">${escapeHtml((p.content || '').slice(0, 180))}</p>
-        <p style="margin:0.2rem 0;color:rgba(255,255,255,0.8);">${escapeHtml(formatIsoDate(p.createdAt))} | ${escapeHtml(p.status || 'published')} | Views: ${Number((p.engagement && p.engagement.views) || 0)}</p>
+        <p style="margin:0.2rem 0;color:rgba(255,255,255,0.8);">${escapeHtml(formatIsoDate(p.createdAt))} | ${escapeHtml(p.status || 'published')} | ${escapeHtml(p.contentType || (p.video ? 'video' : 'post'))}</p>
+        <p style="margin:0.2rem 0;color:rgba(255,255,255,0.82);">Views: ${Number((p.engagement && p.engagement.views) || 0)} · Likes: ${Number((p.engagement && p.engagement.likes) || 0)} · Comments: ${Number((p.engagement && p.engagement.comments) || 0)} · Shares: ${Number((p.engagement && p.engagement.shares) || 0)}</p>
+        <p style="margin:0.2rem 0;color:rgba(154,209,255,0.95);">Smart Reach: ${escapeHtml((p.smartReach && p.smartReach.stage) || 'initial')} · Score: ${Number((p.smartReach && p.smartReach.score) || 0).toFixed(3)} · Impressions: ${Number((p.smartReach && p.smartReach.impressions) || 0)}</p>
         <div style="display:flex;gap:0.5rem;">
           <button type="button" data-action="view" data-id="${escapeHtml(p.id)}">View</button>
           <button type="button" data-action="edit" data-id="${escapeHtml(p.id)}">Edit</button>
@@ -2508,22 +3912,194 @@ async function openCreatorDashboard() {
       return;
     }
     const creator = dashboardData.creator || { totalViews: 0, earnings: 0, availableBalance: 0 };
+    const primaryBusiness = (dashboardData.businessProfiles && dashboardData.businessProfiles[0]) || {};
     stateBox.innerHTML = `
       <p><strong>AFRIQORA ID:</strong> ${escapeHtml((dashboardData.user && dashboardData.user.afriqoraId) || user.afriqoraId || '')}</p>
-      <p><strong>Creator/business name:</strong> ${escapeHtml((dashboardData.businessProfile && dashboardData.businessProfile.businessName) || dashboardData.user.displayName || 'Creator')}</p>
-      <p><strong>Profile:</strong> ${escapeHtml(dashboardData.user.displayName || '')}</p>
+      <p><strong>Creator name:</strong> ${escapeHtml(dashboardData.user.displayName || '')}</p>
+      <p><strong>Primary Business:</strong> ${escapeHtml(primaryBusiness.businessName || 'None')}</p>
       <p><strong>Views / engagement:</strong> ${Number(creator.totalViews || 0)} total views</p>
       <p><strong>Earnings:</strong> $${Number(creator.earnings || 0).toFixed(6)} | <strong>Available:</strong> $${Number(creator.availableBalance || 0).toFixed(6)}</p>
     `;
 
-    const bp = dashboardData.businessProfile || {};
-    panel.querySelector('#dash-biz-name').value = bp.businessName || '';
-    panel.querySelector('#dash-biz-owner').value = bp.ownerDisplayName || dashboardData.user.displayName || '';
-    panel.querySelector('#dash-biz-category').value = bp.category || '';
-    panel.querySelector('#dash-biz-location').value = bp.location || '';
-    panel.querySelector('#dash-biz-website').value = bp.website || '';
-    panel.querySelector('#dash-biz-contact').value = bp.contact || '';
-    panel.querySelector('#dash-biz-description').value = bp.description || '';
+    function renderBusinessList() {
+      const listHolder = panel.querySelector('#dash-biz-list');
+      const bps = dashboardData.businessProfiles || [];
+      if (!bps.length) {
+        listHolder.innerHTML = '<p>No businesses registered yet.</p>';
+      } else {
+        listHolder.innerHTML = bps.map(b => `
+          <div style="border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:0.5rem; margin-bottom:0.5rem;">
+            <strong>${escapeHtml(b.businessName)}</strong>
+            <p style="margin:0; font-size:0.85rem; color:rgba(255,255,255,0.7);">${escapeHtml(b.category || (Array.isArray(b.categories) ? b.categories.join(', ') : ''))}</p>
+            <button class="biz-edit-btn" data-id="${b.id}" style="margin-top:0.25rem;">Edit</button>
+          </div>
+        `).join('');
+        
+        listHolder.querySelectorAll('.biz-edit-btn').forEach(btn => {
+          btn.addEventListener('click', () => openBusinessWizard(btn.dataset.id));
+        });
+      }
+
+      // Populate Create Post select
+      const postBizSelect = panel.querySelector('#dash-post-business-select');
+      if (bps.length > 0) {
+        postBizSelect.style.display = 'block';
+        postBizSelect.innerHTML = bps.map(b => `<option value="${b.id}">${escapeHtml(b.businessName)}</option>`).join('');
+      } else {
+        postBizSelect.style.display = 'none';
+        postBizSelect.innerHTML = '';
+      }
+    }
+    
+    function openBusinessWizard(bizId) {
+      editingBusinessId = bizId || null;
+      panel.querySelector('#biz-list-wrapper').style.display = 'none';
+      panel.querySelector('#biz-wizard-wrapper').style.display = 'block';
+      panel.querySelector('#dash-biz-msg').textContent = '';
+      
+      const bp = (dashboardData.businessProfiles || []).find(b => b.id === bizId) || {};
+      panel.querySelector('#dash-biz-name').value = bp.businessName || '';
+      panel.querySelector('#dash-biz-owner').value = bp.ownerDisplayName || dashboardData.user.displayName || '';
+      
+      const locParts = (bp.location || '').split(', ');
+      panel.querySelector('#dash-biz-country').value = locParts.length > 3 ? locParts[3] : '';
+      panel.querySelector('#dash-biz-region').value = locParts.length > 2 ? locParts[2] : '';
+      panel.querySelector('#dash-biz-city').value = locParts.length > 1 ? locParts[1] : '';
+      panel.querySelector('#dash-biz-location').value = locParts[0] || '';
+      
+      panel.querySelector('#dash-biz-website').value = bp.website || '';
+      panel.querySelector('#dash-biz-contact').value = bp.contact || '';
+      panel.querySelector('#dash-biz-description').value = bp.description || '';
+      
+      selectedCategories = Array.isArray(bp.categories) ? [...bp.categories] : (bp.category ? [bp.category] : []);
+      selectedServices = Array.isArray(bp.services) ? [...bp.services] : [];
+      selectedLanguages = Array.isArray(bp.languagesServed) ? [...bp.languagesServed] : ['en'];
+      
+      panel.querySelectorAll('.biz-wizard-step').forEach(s => s.style.display = 'none');
+      panel.querySelector('#biz-step-1').style.display = 'block';
+      panel.querySelector('#biz-wizard-step-label').innerText = 'Step 1 of 4';
+    }
+    
+    panel.querySelector('#dash-biz-add').addEventListener('click', () => openBusinessWizard(null));
+    panel.querySelector('.biz-cancel').addEventListener('click', () => {
+      panel.querySelector('#biz-wizard-wrapper').style.display = 'none';
+      panel.querySelector('#biz-list-wrapper').style.display = 'block';
+    });
+
+    renderBusinessList();
+
+    // Wizard Nav Logic
+    panel.querySelectorAll('.biz-next').forEach(btn => {
+      btn.onclick = () => {
+        const next = btn.getAttribute('data-next');
+        panel.querySelectorAll('.biz-wizard-step').forEach(s => s.style.display = 'none');
+        panel.querySelector('#biz-step-' + next).style.display = 'block';
+        panel.querySelector('#biz-wizard-step-label').innerText = 'Step ' + next + ' of 4';
+      };
+    });
+    panel.querySelectorAll('.biz-prev').forEach(btn => {
+      btn.onclick = () => {
+        const prev = btn.getAttribute('data-prev');
+        panel.querySelectorAll('.biz-wizard-step').forEach(s => s.style.display = 'none');
+        panel.querySelector('#biz-step-' + prev).style.display = 'block';
+        panel.querySelector('#biz-wizard-step-label').innerText = 'Step ' + prev + ' of 4';
+      };
+    });
+
+    // Initialize Tag Inputs
+    let selectedCategories = Array.isArray(bp.categories) ? [...bp.categories] : (bp.category ? [bp.category] : []);
+    let selectedServices = Array.isArray(bp.services) ? [...bp.services] : [];
+    let selectedLanguages = Array.isArray(bp.languagesServed) ? [...bp.languagesServed] : ['en'];
+    
+    function renderTagInput(containerId, tags, placeholder, suggestions) {
+      const container = panel.querySelector('#' + containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      
+      const tagsWrapper = document.createElement('div');
+      tagsWrapper.style.display = 'flex';
+      tagsWrapper.style.flexWrap = 'wrap';
+      tagsWrapper.style.gap = '4px';
+      tagsWrapper.style.marginBottom = '4px';
+      
+      const renderTags = () => {
+        tagsWrapper.innerHTML = '';
+        tags.forEach((tag, idx) => {
+          const tagEl = document.createElement('span');
+          tagEl.style.background = '#e2e8f0';
+          tagEl.style.color = '#000';
+          tagEl.style.padding = '2px 8px';
+          tagEl.style.borderRadius = '12px';
+          tagEl.style.fontSize = '0.85rem';
+          tagEl.style.display = 'flex';
+          tagEl.style.alignItems = 'center';
+          tagEl.style.gap = '4px';
+          tagEl.innerHTML = `<span>${escapeHtml(tag)}</span><span style="cursor:pointer;font-weight:bold;">&times;</span>`;
+          tagEl.querySelector('span:last-child').onclick = () => {
+            tags.splice(idx, 1);
+            renderTags();
+          };
+          tagsWrapper.appendChild(tagEl);
+        });
+      };
+      renderTags();
+      container.appendChild(tagsWrapper);
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = placeholder;
+      input.style.border = 'none';
+      input.style.outline = 'none';
+      input.style.width = '100%';
+      input.style.background = 'transparent';
+      input.style.color = '#000';
+      input.style.padding = '4px';
+      
+      const datalistId = containerId + '-dl';
+      const datalist = document.createElement('datalist');
+      datalist.id = datalistId;
+      suggestions.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        datalist.appendChild(opt);
+      });
+      container.appendChild(datalist);
+      input.setAttribute('list', datalistId);
+      
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = input.value.trim();
+          if (val && !tags.includes(val)) {
+            tags.push(val);
+            input.value = '';
+            renderTags();
+          }
+        }
+      });
+      container.appendChild(input);
+    }
+    
+    // Fetch metadata
+    apiRequest('/api/business/metadata').then(r => r.json()).then(meta => {
+      if (meta && meta.ok) {
+        renderTagInput('dash-biz-categories-container', selectedCategories, 'Add Category (Press Enter)', meta.categories || []);
+        renderTagInput('dash-biz-services-container', selectedServices, 'Add Service Provided (Press Enter)', meta.services || []);
+      }
+    }).catch(e => {
+       renderTagInput('dash-biz-categories-container', selectedCategories, 'Add Category (Press Enter)', []);
+       renderTagInput('dash-biz-services-container', selectedServices, 'Add Service Provided (Press Enter)', []);
+    });
+    
+    // Expose for save function
+    panel.dataset.selectedCategories = JSON.stringify(selectedCategories);
+    panel.dataset.selectedServices = JSON.stringify(selectedServices);
+    panel.dataset.selectedLanguages = JSON.stringify(selectedLanguages);
+    setInterval(() => {
+       panel.dataset.selectedCategories = JSON.stringify(selectedCategories);
+       panel.dataset.selectedServices = JSON.stringify(selectedServices);
+       panel.dataset.selectedLanguages = JSON.stringify(selectedLanguages);
+    }, 500);
 
     myPosts = dashboardData.posts || [];
     renderPostsList();
@@ -2541,10 +4117,11 @@ async function openCreatorDashboard() {
     const videoFile = panel.querySelector('#dash-post-video').files?.[0];
     const msg = panel.querySelector('#dash-post-msg');
 
-    if (!title || !content) {
-      msg.textContent = 'Title and content are required.';
+    if (!content) {
+      msg.textContent = 'Content is required.';
       return;
     }
+    const finalTitle = title || (content.substring(0, 100) + (content.length > 100 ? '...' : ''));
     const existing = myPosts.find(p => String(p.id) === String(editingPostId));
     let image = existing ? existing.image : null;
     let video = existing ? existing.video : null;
@@ -2563,7 +4140,10 @@ async function openCreatorDashboard() {
       return;
     }
 
-    const payload = { title, content, category, location, website, contact, image, video, status: 'published' };
+    const bizSelect = panel.querySelector('#dash-post-business-select');
+    const businessId = bizSelect && bizSelect.style.display !== 'none' ? bizSelect.value : null;
+
+    const payload = { title: finalTitle, content, category, location, website, contact, image, video, status: 'published', contentType: 'business_listing', businessId };
     const endpoint = editingPostId ? '/creator/posts/' + encodeURIComponent(String(editingPostId)) : '/creator/posts';
     const method = editingPostId ? 'PUT' : 'POST';
     const res = await apiRequest(endpoint, { method, body: JSON.stringify(payload) });
@@ -2581,6 +4161,7 @@ async function openCreatorDashboard() {
     renderPostsList();
     syncServerPostsIntoLocalFeed(myPosts, user);
     resetPostForm();
+    setTimeout(() => { renderNavHomeView(document.getElementById('af-nav-home-view')); }, 500);
   });
 
   panel.querySelector('#dash-post-cancel').addEventListener('click', resetPostForm);
@@ -2588,13 +4169,27 @@ async function openCreatorDashboard() {
   panel.querySelector('#dash-biz-save').addEventListener('click', async () => {
     const businessName = panel.querySelector('#dash-biz-name').value.trim();
     const ownerDisplayName = panel.querySelector('#dash-biz-owner').value.trim();
-    const category = panel.querySelector('#dash-biz-category').value.trim();
-    const location = panel.querySelector('#dash-biz-location').value.trim();
+    
+    const country = panel.querySelector('#dash-biz-country').value.trim();
+    const region = panel.querySelector('#dash-biz-region').value.trim();
+    const city = panel.querySelector('#dash-biz-city').value.trim();
+    const loc = panel.querySelector('#dash-biz-location').value.trim();
+    const location = [loc, city, region, country].filter(Boolean).join(', ');
+    
     const website = panel.querySelector('#dash-biz-website').value.trim();
     const contact = panel.querySelector('#dash-biz-contact').value.trim();
     const description = panel.querySelector('#dash-biz-description').value.trim();
     const logoFile = panel.querySelector('#dash-biz-logo').files?.[0];
     const msg = panel.querySelector('#dash-biz-msg');
+    let categories = [];
+    let services = [];
+    let languagesServed = ['en'];
+    try {
+      categories = JSON.parse(panel.dataset.selectedCategories || '[]');
+      services = JSON.parse(panel.dataset.selectedServices || '[]');
+      languagesServed = JSON.parse(panel.dataset.selectedLanguages || '["en"]');
+    } catch(e) {}
+    
     let logo = dashboardData && dashboardData.businessProfile ? dashboardData.businessProfile.logo : null;
     if (!businessName) {
       msg.textContent = 'Business name is required.';
@@ -2606,15 +4201,25 @@ async function openCreatorDashboard() {
       msg.textContent = 'Unable to read logo file.';
       return;
     }
-    const payload = { businessName, ownerDisplayName, category, location, website, contact, description, logo };
+    const payload = { id: editingBusinessId, businessName, ownerDisplayName, categories, services, languagesServed, location, website, contact, description, logo };
     const res = await apiRequest('/creator/business-profile', { method: 'POST', body: JSON.stringify(payload) });
     const data = await res.json().catch(() => ({ error: 'request failed' }));
     if (!res.ok || !data.ok) {
       msg.textContent = data.error || 'Unable to save business profile.';
       return;
     }
-    dashboardData.businessProfile = data.businessProfile;
+    dashboardData.businessProfiles = dashboardData.businessProfiles || [];
+    if (editingBusinessId) {
+      dashboardData.businessProfiles = dashboardData.businessProfiles.map(b => String(b.id) === String(editingBusinessId) ? data.businessProfile : b);
+    } else {
+      dashboardData.businessProfiles.push(data.businessProfile);
+    }
     upsertBusinessProfileToLocal(data.businessProfile, user);
+    panel.querySelector('#biz-wizard-wrapper').style.display = 'none';
+    panel.querySelector('#biz-list-wrapper').style.display = 'block';
+    
+    // Call renderBusinessList which was declared in loadDashboard. Since we can't easily, we just reload dashboard
+    loadDashboard();
     msg.textContent = 'Business profile saved.';
   });
 
@@ -2661,15 +4266,15 @@ function renderActiveCallUI(call, isCaller) {
     if (!call || !call.localStream) return; const videoTracks = call.localStream.getVideoTracks(); if (!videoTracks.length) return; videoTracks.forEach(t=>t.enabled = !videoTracks[0].enabled); camBtn.textContent = videoTracks[0].enabled ? 'Camera Off' : 'Camera On';
   });
   endBtn.addEventListener('click', ()=>{
-    signalingClient.send({ type:'call-end', from: getClientId(), to: call.targetId });
+    const client = ensureSignalingClient({ autoRetry: true });
+    if (client) client.send({ type:'call-end', from: getClientId(), to: call.targetId });
     endCurrentCall();
   });
 }
 
 // Handle signaling messages
-signalingClient.onmessage = async (msg) => {
+async function handleSignalingMessage(msg) {
   if (!msg || !msg.type) return;
-  const clientId = getClientId();
   switch(msg.type) {
     case 'offer':
       // incoming offer
@@ -2695,7 +4300,7 @@ signalingClient.onmessage = async (msg) => {
     default:
       break;
   }
-};
+}
 
 // wire business and marketplace call buttons after rendering functions
 function wireCallButtons() {
@@ -2725,3 +4330,2391 @@ function wireCallButtons() {
 
 // call wire after initial renders
 setTimeout(wireCallButtons, 600);
+
+// -------------------- Primary Navigation System --------------------
+const AFRIQORA_MESSAGES_STORAGE_KEY = 'afriqoraMessagesThreadV1';
+const AFRIQORA_NAV_ROUTES = [
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'search', label: 'Search', icon: 'search' },
+  { id: 'activity', label: 'Activity', icon: 'activity' },
+  { id: 'notifications', label: 'Notifications', icon: 'bell' },
+  { id: 'messages', label: 'Messages', icon: 'message' },
+  { id: 'profile', label: 'Profile', icon: 'user' },
+  { id: 'settings', label: 'Settings', icon: 'settings' }
+];
+let afNavNotificationPollTimer = null;
+
+function formatBadgeCount(count) {
+  const n = Number(count || 0);
+  if (n <= 0) return '';
+  if (n > 99) return '99+';
+  return String(n);
+}
+
+function updateNavBadge(routeId, count) {
+  document.querySelectorAll('[data-nav-route="' + String(routeId || '') + '"]').forEach((btn) => {
+    const badge = btn.querySelector('.af-nav-badge');
+    if (!badge) return;
+    const n = Number(count || 0);
+    if (n > 0) {
+      badge.hidden = false;
+      badge.textContent = formatBadgeCount(n);
+      badge.setAttribute('aria-label', String(n) + ' unread');
+    } else {
+      badge.hidden = true;
+      badge.textContent = '';
+      badge.removeAttribute('aria-label');
+    }
+  });
+}
+
+async function fetchNotificationUnreadSummary() {
+  const me = await fetchCurrentUser(false);
+  if (!me) return { unreadCount: 0, unreadByCategory: {} };
+  try {
+    const res = await apiRequest('/notifications/unread-count', { method: 'GET' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.ok) return { unreadCount: 0, unreadByCategory: {} };
+    return {
+      unreadCount: Number(data.unreadCount || 0),
+      unreadByCategory: data.unreadByCategory && typeof data.unreadByCategory === 'object' ? data.unreadByCategory : {}
+    };
+  } catch (e) {
+    return { unreadCount: 0, unreadByCategory: {} };
+  }
+}
+
+async function refreshNotificationBadges() {
+  const summary = await fetchNotificationUnreadSummary();
+  updateNavBadge('notifications', Number(summary.unreadCount || 0));
+  const messageUnread = Number((summary.unreadByCategory || {}).messages || 0);
+  updateNavBadge('messages', messageUnread);
+}
+
+function ensurePrimaryNavStyles() {
+  if (document.getElementById('afriqora-primary-nav-style')) return;
+  const style = document.createElement('style');
+  style.id = 'afriqora-primary-nav-style';
+  style.textContent = `
+    :root {
+      --af-nav-ink: #081e2f;
+      --af-nav-ink-soft: #0f2b3f;
+      --af-nav-sand: #f3e6c7;
+      --af-nav-gold: #e6b85c;
+      --af-nav-teal: #15b8a6;
+      --af-nav-sky: #3bb7ea;
+      --af-nav-fog: rgba(234, 243, 248, 0.88);
+      --af-nav-line: rgba(255, 255, 255, 0.14);
+    }
+    .af-nav-shell {
+      display: grid;
+      grid-template-columns: 268px 1fr;
+      min-height: 100vh;
+      background:
+        radial-gradient(140% 90% at 105% -10%, rgba(21, 184, 166, 0.18), transparent 55%),
+        radial-gradient(110% 80% at -10% 110%, rgba(230, 184, 92, 0.16), transparent 50%),
+        linear-gradient(180deg, rgba(8, 24, 38, 0.98), rgba(8, 20, 34, 0.98));
+    }
+    .af-nav-sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 1rem 0.8rem;
+      border-right: 1px solid var(--af-nav-line);
+      background:
+        linear-gradient(145deg, rgba(22, 184, 166, 0.12), transparent 42%),
+        repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.035) 0 6px, transparent 6px 14px),
+        linear-gradient(180deg, rgba(7, 22, 36, 0.97), rgba(9, 26, 40, 0.93));
+      backdrop-filter: blur(8px);
+      overflow: auto;
+      z-index: 20;
+    }
+    .af-nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin: 0.35rem 0.25rem 0.9rem;
+      padding: 0.56rem 0.64rem;
+      border-radius: 12px;
+      border: 1px solid var(--af-nav-line);
+      background: linear-gradient(120deg, rgba(255,255,255,0.065), rgba(255,255,255,0.028));
+      color: var(--af-nav-sand);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .af-nav-brand-mark {
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 0.65rem 0.22rem 0.65rem 0.22rem;
+      display: inline-grid;
+      place-items: center;
+      background: linear-gradient(130deg, var(--af-nav-gold), var(--af-nav-teal));
+      color: #102b3a;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .af-nav-signature {
+      margin: 0.38rem 0.28rem 0.7rem;
+      font-size: 0.74rem;
+      color: rgba(232, 245, 252, 0.75);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .af-nav-menu {
+      display: grid;
+      gap: 0.45rem;
+    }
+    .af-nav-btn {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(102deg, rgba(255,255,255,0.065), rgba(255,255,255,0.025));
+      color: #e8f4fb;
+      border-radius: 10px 16px 10px 16px;
+      padding: 0.56rem 0.64rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 0.58rem;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+      position: relative;
+    }
+    .af-nav-btn::before {
+      content: '';
+      position: absolute;
+      left: 0.18rem;
+      top: 0.32rem;
+      bottom: 0.32rem;
+      width: 0.2rem;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(59, 183, 234, 0.8), rgba(230, 184, 92, 0.8));
+      opacity: 0;
+      transform: scaleY(0.5);
+      transform-origin: center;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    .af-nav-btn:hover,
+    .af-nav-btn:focus-visible {
+      outline: none;
+      border-color: rgba(59, 183, 234, 0.62);
+      transform: translateX(2px);
+    }
+    .af-nav-btn.active {
+      border-color: rgba(230, 184, 92, 0.84);
+      background: linear-gradient(114deg, rgba(21, 184, 166, 0.24), rgba(230, 184, 92, 0.2));
+      color: #fff8e6;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    .af-nav-btn.active::before {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+    .af-nav-label-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+    .af-nav-badge {
+      display: inline-grid;
+      place-items: center;
+      min-width: 1.05rem;
+      height: 1.05rem;
+      padding: 0 0.26rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: linear-gradient(120deg, rgba(244,63,94,0.85), rgba(251,146,60,0.85));
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .af-nav-badge[hidden] {
+      display: none;
+    }
+    .af-nav-icon {
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 0.55rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(9, 39, 57, 0.56);
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .af-nav-icon svg {
+      width: 0.92rem;
+      height: 0.92rem;
+      stroke: #f5eacc;
+    }
+    .af-nav-content {
+      min-width: 0;
+      padding: 0.5rem 0.6rem 1rem;
+    }
+    .af-nav-top {
+      position: sticky;
+      top: 0;
+      z-index: 18;
+      margin: 0 0 0.75rem;
+      padding: 0.65rem 0.8rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(104deg, rgba(7, 24, 38, 0.78), rgba(16, 40, 57, 0.76));
+      color: #f8f4de;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      backdrop-filter: blur(6px);
+    }
+    .af-nav-title {
+      margin: 0;
+      font-size: 1.02rem;
+      letter-spacing: 0.04em;
+    }
+    .af-nav-subtitle {
+      margin: 0.2rem 0 0;
+      color: rgba(238, 245, 224, 0.82);
+      font-size: 0.82rem;
+    }
+    .af-nav-route {
+      display: none;
+    }
+    .af-nav-route.active {
+      display: block;
+    }
+    .af-view-card {
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 14px;
+      background:
+        linear-gradient(122deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)),
+        rgba(8, 22, 35, 0.62);
+      color: #f4fbff;
+      padding: 0.9rem;
+      margin-bottom: 0.65rem;
+    }
+    .af-view-card h3 {
+      margin: 0 0 0.25rem;
+      font-size: 1rem;
+    }
+    .af-view-hint {
+      margin: 0;
+      color: rgba(216, 232, 250, 0.75);
+      font-size: 0.84rem;
+    }
+    .af-view-grid {
+      display: grid;
+      gap: 0.6rem;
+      margin-top: 0.65rem;
+    }
+    .af-view-item {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 0.62rem;
+      background: rgba(255,255,255,0.04);
+    }
+    .af-view-item p {
+      margin: 0.2rem 0;
+      font-size: 0.88rem;
+    }
+    .af-search-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.55rem;
+    }
+    .af-search-row input {
+      flex: 1 1 260px;
+      min-width: 0;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 0.55rem 0.65rem;
+    }
+    .af-search-row button,
+    .af-view-item button,
+    .af-messages-form button,
+    .af-profile-actions button {
+      border: 1px solid rgba(230, 184, 92, 0.58);
+      background: linear-gradient(120deg, rgba(21, 184, 166, 0.28), rgba(230, 184, 92, 0.25));
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.48rem 0.72rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .af-loading {
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.7rem;
+      background: rgba(255,255,255,0.04);
+      font-size: 0.86rem;
+      color: rgba(219, 234, 251, 0.84);
+    }
+    .af-nav-mobile {
+      display: none;
+    }
+    .af-messages-thread {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.6rem;
+      max-height: 45vh;
+      overflow: auto;
+      padding-right: 0.15rem;
+    }
+    .af-message-bubble {
+      border-radius: 10px;
+      padding: 0.55rem 0.62rem;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+    }
+    .af-message-bubble.self {
+      border-color: rgba(52, 211, 153, 0.45);
+      background: rgba(52, 211, 153, 0.12);
+    }
+    .af-message-meta {
+      margin: 0.25rem 0 0;
+      color: rgba(215, 233, 251, 0.7);
+      font-size: 0.76rem;
+    }
+    .af-messages-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.55rem;
+      flex-wrap: wrap;
+    }
+    .af-messages-form input {
+      flex: 1 1 260px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 0.55rem 0.62rem;
+    }
+    .af-profile-stats {
+      display: grid;
+      gap: 0.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-top: 0.6rem;
+    }
+    .af-profile-stat {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      padding: 0.55rem;
+    }
+    .af-profile-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.65rem;
+    }
+    .af-note-toolbar {
+      margin-top: 0.65rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+    .af-note-list {
+      margin-top: 0.65rem;
+      display: grid;
+      gap: 0.52rem;
+    }
+    .af-note-card {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.045);
+      padding: 0.62rem;
+      cursor: pointer;
+    }
+    .af-note-card.unread {
+      border-color: rgba(230,184,92,0.72);
+      background: linear-gradient(120deg, rgba(230,184,92,0.15), rgba(59,183,234,0.12));
+    }
+    .af-note-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.55rem;
+      margin-bottom: 0.3rem;
+      font-size: 0.82rem;
+      color: rgba(215,233,251,0.84);
+    }
+    .af-note-type {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.32rem;
+      text-transform: capitalize;
+    }
+    .af-note-title {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #fff;
+    }
+    .af-note-message {
+      margin: 0.22rem 0 0;
+      font-size: 0.84rem;
+      color: rgba(222,237,248,0.9);
+      line-height: 1.4;
+    }
+    .af-note-meta {
+      margin-top: 0.36rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.45rem;
+      color: rgba(208,228,245,0.77);
+      font-size: 0.76rem;
+    }
+    .af-note-actions {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    .af-note-actions button {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.08);
+      color: #f5fbff;
+      padding: 0.35rem 0.6rem;
+      font-size: 0.76rem;
+      cursor: pointer;
+    }
+    .af-note-empty,
+    .af-note-error {
+      margin-top: 0.7rem;
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 10px;
+      padding: 0.68rem;
+      background: rgba(255,255,255,0.04);
+      color: rgba(220,236,250,0.84);
+      font-size: 0.86rem;
+    }
+    .af-note-error {
+      border-color: rgba(248,113,113,0.45);
+      color: #ffd9cf;
+    }
+    @media (max-width: 980px) {
+      .af-nav-shell {
+        grid-template-columns: 1fr;
+      }
+      .af-nav-sidebar {
+        display: none;
+      }
+      .af-nav-content {
+        padding: 0.45rem 0.45rem 4.8rem;
+      }
+      .af-nav-mobile {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.28rem;
+        padding: 0.4rem 0.32rem calc(0.45rem + env(safe-area-inset-bottom));
+        border-top: 1px solid rgba(255,255,255,0.15);
+        background:
+          linear-gradient(0deg, rgba(10, 27, 41, 0.98), rgba(10, 27, 41, 0.98)),
+          repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 8px, transparent 8px 15px);
+        backdrop-filter: blur(8px);
+      }
+      .af-nav-mobile-btn {
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 10px;
+        background: linear-gradient(104deg, rgba(255,255,255,0.08), rgba(255,255,255,0.035));
+        color: #f1f6dd;
+        padding: 0.38rem 0.2rem;
+        display: grid;
+        place-items: center;
+        gap: 0.16rem;
+        font-size: 0.61rem;
+        line-height: 1.2;
+        position: relative;
+      }
+      .af-nav-mobile-btn .af-nav-label-wrap {
+        gap: 0.22rem;
+      }
+      .af-nav-mobile-btn .af-nav-badge {
+        min-width: 0.94rem;
+        height: 0.94rem;
+        font-size: 0.58rem;
+      }
+      .af-nav-mobile-btn.active {
+        border-color: rgba(230, 184, 92, 0.78);
+        background: linear-gradient(120deg, rgba(21, 184, 166, 0.28), rgba(230, 184, 92, 0.25));
+      }
+      .af-nav-mobile-btn svg {
+        width: 0.88rem;
+        height: 0.88rem;
+        stroke: #fff0c7;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function getPrimaryRouteSubtitle(routeId) {
+  const subtitles = {
+    home: 'Your AFRIQORA command center',
+    search: 'Discover verified opportunities',
+    activity: 'Track momentum across your work',
+    notifications: 'Signals that need your attention',
+    messages: 'Conversations with business context',
+    profile: 'Identity, creator metrics, and account',
+    settings: 'Control your cross-device preferences'
+  };
+  return subtitles[routeId] || 'AFRIQORA navigation';
+}
+
+function primaryNavIcon(name) {
+  const icons = {
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-5 4 10 2.5-5H21"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1112 0v4l2 3H4l2-3V9"/><path d="M10 19a2 2 0 004 0"/></svg>',
+    message: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 3V5z"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z"/><path d="M19.4 15a1 1 0 00.2 1.1l.1.1a2 2 0 010 2.8 2 2 0 01-2.8 0l-.1-.1a1 1 0 00-1.1-.2 1 1 0 00-.6.9V20a2 2 0 01-4 0v-.2a1 1 0 00-.6-.9 1 1 0 00-1.1.2l-.1.1a2 2 0 01-2.8 0 2 2 0 010-2.8l.1-.1a1 1 0 00.2-1.1 1 1 0 00-.9-.6H4a2 2 0 010-4h.2a1 1 0 00.9-.6 1 1 0 00-.2-1.1l-.1-.1a2 2 0 010-2.8 2 2 0 012.8 0l.1.1a1 1 0 001.1.2 1 1 0 00.6-.9V4a2 2 0 014 0v.2a1 1 0 00.6.9 1 1 0 001.1-.2l.1-.1a2 2 0 012.8 0 2 2 0 010 2.8l-.1.1a1 1 0 00-.2 1.1 1 1 0 00.9.6H20a2 2 0 010 4h-.2a1 1 0 00-.9.6z"/></svg>'
+  };
+  return icons[name] || icons.home;
+}
+
+function getNavRouteFromHash() {
+  const raw = String(window.location.hash || '').replace(/^#\/?/, '').trim().toLowerCase();
+  if (!raw) return 'home';
+  const routeOnly = raw.split('?')[0].trim();
+  return AFRIQORA_NAV_ROUTES.some((r) => r.id === routeOnly) ? routeOnly : 'home';
+}
+
+function getNavHashParams() {
+  const raw = String(window.location.hash || '').replace(/^#\/?/, '').trim();
+  const q = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+  const params = {};
+  if (!q) return params;
+  q.split('&').forEach((part) => {
+    if (!part) return;
+    const idx = part.indexOf('=');
+    if (idx === -1) {
+      params[decodeURIComponent(part)] = '';
+      return;
+    }
+    const k = decodeURIComponent(part.slice(0, idx));
+    const v = decodeURIComponent(part.slice(idx + 1));
+    params[k] = v;
+  });
+  return params;
+}
+
+function loadMessageThread() {
+  try {
+    const raw = localStorage.getItem(AFRIQORA_MESSAGES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {}
+  return [{ id: 'seed-1', from: 'support', text: 'Welcome to AFRIQORA Messages. Ask us for help with your account, creator tools, or settings.', createdAt: new Date().toISOString() }];
+}
+
+function saveMessageThread(items) {
+  try { localStorage.setItem(AFRIQORA_MESSAGES_STORAGE_KEY, JSON.stringify(items || [])); } catch (e) {}
+}
+
+const AFRIQORA_HOME_FEED_PAGE_SIZE = 8;
+
+function ensureHomeFeedStyles() {
+  if (document.getElementById('afriqora-home-feed-style')) return;
+  const style = document.createElement('style');
+  style.id = 'afriqora-home-feed-style';
+  style.textContent = `
+    .af-home-feed-wrap {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      background: linear-gradient(130deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+      padding: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+    .af-home-feed-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.65rem;
+      margin-bottom: 0.65rem;
+    }
+    .af-home-feed-head h3 { margin: 0; font-size: 1.02rem; }
+    .af-home-feed-head p { margin: 0.2rem 0 0; color: rgba(226,236,247,0.82); font-size: 0.84rem; }
+    .af-home-feed-state { color: rgba(226,236,247,0.9); font-size: 0.83rem; }
+    .af-home-feed-list { display: grid; gap: 0.7rem; }
+    .af-home-card {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px;
+      background: rgba(8, 21, 34, 0.62);
+      padding: 0.72rem;
+    }
+    .af-home-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; }
+    .af-home-card-author {
+      border: 0;
+      background: transparent;
+      color: #f1f6de;
+      text-align: left;
+      padding: 0;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .af-home-card-meta { margin: 0.16rem 0 0; color: rgba(214,230,245,0.76); font-size: 0.78rem; }
+    .af-home-chip {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px;
+      padding: 0.16rem 0.46rem;
+      font-size: 0.7rem;
+      color: #fff6db;
+      background: rgba(255,255,255,0.07);
+      white-space: nowrap;
+    }
+    .af-home-title { margin: 0.55rem 0 0.35rem; font-size: 1.02rem; color: #fff; }
+    .af-home-content { margin: 0; color: rgba(229,239,247,0.92); white-space: pre-wrap; }
+    .af-home-media { margin-top: 0.58rem; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); background: #031726; }
+    .af-home-media img, .af-home-media video { width: 100%; display: block; max-height: 420px; object-fit: cover; }
+    .af-home-media-note { margin: 0; padding: 0.62rem; color: rgba(229,239,247,0.88); font-size: 0.8rem; }
+    .af-home-video-controls { display: flex; justify-content: flex-end; padding: 0.45rem; }
+    .af-home-video-load {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      background: linear-gradient(120deg, rgba(19,184,166,0.28), rgba(230,184,92,0.23));
+      color: #fff;
+      padding: 0.42rem 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .af-home-stats { margin: 0.5rem 0 0; color: rgba(218,233,245,0.8); font-size: 0.78rem; }
+    .af-home-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.55rem; }
+    .af-home-actions button {
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.07);
+      color: #fff;
+      padding: 0.34rem 0.62rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .af-home-comments { margin-top: 0.55rem; display: none; }
+    .af-home-comments.open { display: block; }
+    .af-home-comments-list { max-height: 180px; overflow: auto; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 0.4rem; background: rgba(255,255,255,0.03); }
+    .af-home-comment-item { margin-bottom: 0.3rem; font-size: 0.82rem; color: rgba(236,245,253,0.95); }
+    .af-home-comment-form { display: flex; gap: 0.45rem; margin-top: 0.45rem; }
+    .af-home-comment-form input {
+      flex: 1;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 0.42rem 0.58rem;
+    }
+    .af-home-comment-form button {
+      border: 1px solid rgba(230,184,92,0.55);
+      border-radius: 10px;
+      background: linear-gradient(120deg, rgba(19,184,166,0.28), rgba(230,184,92,0.23));
+      color: #fff;
+      padding: 0.42rem 0.68rem;
+      cursor: pointer;
+    }
+    .af-home-sentinel { height: 20px; }
+    @media (max-width: 980px) {
+      .af-home-card { padding: 0.62rem; }
+      .af-home-title { font-size: 0.95rem; }
+      .af-home-actions button { flex: 1 1 auto; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+const AFRIQORA_SAFE_IMAGE_PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#113a5b"/><stop offset="100%" stop-color="#1e6951"/></linearGradient></defs><rect width="1200" height="675" fill="url(#g)"/><text x="50%" y="47%" text-anchor="middle" fill="#e8f6ff" font-size="46" font-family="Arial, sans-serif">AFRIQORA Media Placeholder</text><text x="50%" y="56%" text-anchor="middle" fill="#d7ebf8" font-size="24" font-family="Arial, sans-serif">Upload image or video in Creator Dashboard</text></svg>');
+
+function isBlockedPlaceholderMediaUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return false;
+  try {
+    const u = new URL(raw, window.location.origin);
+    return /(^|\.)example\.com$/i.test(String(u.hostname || ''));
+  } catch (e) {
+    return /example\.com/i.test(raw);
+  }
+}
+
+async function fetchMessageThread() {
+  const me = await fetchCurrentUser(false);
+  if (!me) return loadMessageThread();
+  try {
+    const res = await apiRequest('/messages/thread', { method: 'GET' });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.ok && Array.isArray(data.thread)) {
+      saveMessageThread(data.thread);
+      return data.thread;
+    }
+  } catch (e) {}
+  return loadMessageThread();
+}
+
+async function sendMessageThreadMessage(text) {
+  const value = String(text || '').trim();
+  if (!value) return { ok: false };
+  const me = await fetchCurrentUser(false);
+  if (!me) {
+    const items = loadMessageThread();
+    items.push({ id: 'm-' + Date.now(), from: 'self', text: value, createdAt: new Date().toISOString() });
+    items.push({ id: 'm-' + (Date.now() + 1), from: 'support', text: 'AFRIQORA Support received your message. We will follow up shortly.', createdAt: new Date().toISOString() });
+    saveMessageThread(items);
+    return { ok: true, thread: items };
+  }
+  try {
+    const res = await apiRequest('/messages/thread', { method: 'POST', body: JSON.stringify({ text: value }) });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.ok) {
+      const fresh = await fetchMessageThread();
+      return { ok: true, thread: fresh };
+    }
+  } catch (e) {}
+  return { ok: false };
+}
+
+function homeFeedCardHtml(item) {
+  const kind = item.postKind || (item.business ? 'business' : 'creator');
+  const chip = (kind === 'business' || item.contentType === 'business_listing') ? 'Business Listing' : (item.contentType === 'video' ? 'Video Post' : (item.contentType === 'image' ? 'Image Post' : 'Social Post'));
+  const summary = String(item.content || '').slice(0, 1200);
+  const imageIsPlaceholder = isBlockedPlaceholderMediaUrl(item.image);
+  const videoIsPlaceholder = isBlockedPlaceholderMediaUrl(item.video);
+  const safeImage = imageIsPlaceholder ? AFRIQORA_SAFE_IMAGE_PLACEHOLDER : item.image;
+  const safeVideo = videoIsPlaceholder ? '' : item.video;
+  const hasImage = !!safeImage;
+  const hasVideo = !!safeVideo;
+  const videoPoster = hasImage ? ` poster="${escapeHtml(safeImage)}"` : '';
+  return `
+    <article class="af-home-card" data-home-content-id="${escapeHtml(item.id)}">
+      <div class="af-home-card-top">
+        <div>
+          <button class="af-home-card-author" data-home-author="${escapeHtml(item.ownerAfriqoraId || '')}">${escapeHtml(item.ownerDisplayName || 'AFRIQORA Creator')}</button>
+          <p class="af-home-card-meta">${escapeHtml(formatIsoDate(item.publishedAt || item.createdAt))} · ${escapeHtml(item.category || 'General')} · ${escapeHtml(item.location || 'Unknown location')}</p>
+        </div>
+        <span class="af-home-chip">${escapeHtml(chip)}</span>
+      </div>
+      <h4 class="af-home-title">${escapeHtml(item.title || 'Untitled')}</h4>
+      <p class="af-home-content">${escapeHtml(summary)}</p>
+      ${hasImage ? `<div class="af-home-media"><img src="${escapeHtml(safeImage)}" alt="${escapeHtml(item.title || 'Post image')}"></div>` : ''}
+      ${hasVideo ? `<div class="af-home-media"><video data-feed-video="1" data-content-id="${escapeHtml(item.id)}" data-src="${escapeHtml(safeVideo)}" preload="none" controls${videoPoster}></video><div class="af-home-video-controls"><button class="af-home-video-load" data-video-load="${escapeHtml(item.id)}">Load Video</button></div></div>` : ''}
+      ${(videoIsPlaceholder && !hasVideo) ? '<div class="af-home-media"><p class="af-home-media-note">Video source unavailable in demo mode. Upload a local AFRIQORA video to play this post.</p></div>' : ''}
+      ${(item.contentType === 'business_listing' && item.contact) ? `<p class="af-home-contact" style="margin-top:0.5rem;font-weight:500;color:var(--accent);">📞 Contact: ${escapeHtml(item.contact)}</p>` : ''}
+      <p class="af-home-stats" data-home-stats="${escapeHtml(item.id)}">Views: ${Number((item.engagement && item.engagement.views) || (item.smartReach && item.smartReach.views) || 0)} · Likes: ${Number((item.engagement && item.engagement.likes) || 0)} · Comments: ${Number((item.engagement && item.engagement.comments) || 0)} · Shares: ${Number((item.engagement && item.engagement.shares) || 0)} · Saves: ${Number((item.engagement && item.engagement.saves) || 0)}</p>
+      <div class="af-home-actions">
+        <button data-action="like" data-id="${escapeHtml(item.id)}">Like</button>
+        <button data-action="comment-toggle" data-id="${escapeHtml(item.id)}">Comments</button>
+        <button data-action="share" data-id="${escapeHtml(item.id)}">Share</button>
+        <button data-action="save" data-id="${escapeHtml(item.id)}">Save</button>
+        <button data-action="report" data-id="${escapeHtml(item.id)}">Report</button>
+        <button data-action="not-interested" data-id="${escapeHtml(item.id)}">Not Interested</button>
+      </div>
+      <div class="af-home-comments" data-home-comments="${escapeHtml(item.id)}">
+        <div class="af-home-comments-list" data-home-comments-list="${escapeHtml(item.id)}"></div>
+        <form class="af-home-comment-form" data-home-comment-form="${escapeHtml(item.id)}">
+          <input type="text" placeholder="Write a comment" aria-label="Comment text">
+          <button type="submit">Post</button>
+        </form>
+      </div>
+    </article>
+  `;
+}
+
+async function renderNavHomeView(container) {
+  ensureHomeFeedStyles();
+  if (!container) return;
+
+  let mount = container.querySelector('#af-home-feed-root');
+  if (!mount) {
+    mount = document.createElement('section');
+    mount.id = 'af-home-feed-root';
+    container.prepend(mount);
+  }
+
+  mount.innerHTML = `
+    <section class="af-home-feed-wrap">
+      <div class="af-home-feed-head">
+        <div>
+          <h3>AFRIQORA Home Feed</h3>
+          <p>Smart Reach powered feed with real engagement and relevance ordering.</p>
+        </div>
+        <div class="af-home-feed-state" id="af-home-feed-state">Loading...</div>
+      </div>
+      
+      <!-- New Social Post Composer -->
+      <div class="af-view-card" style="margin-bottom: 1.5rem; background: var(--bg-card); padding: 1rem; border-radius: 8px;">
+        <h4 style="margin-top:0;">Create Post</h4>
+        <textarea id="af-feed-post-content" placeholder="What's on your mind?" rows="3" style="width:100%; margin-bottom: 0.5rem;"></textarea>
+        <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem;">
+          <div style="flex: 1;">
+            <label style="display:block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem;">Attach Photo</label>
+            <input type="file" id="af-feed-post-image" accept="image/*" style="width:100%;">
+          </div>
+          <div style="flex: 1;">
+            <label style="display:block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem;">Attach Video</label>
+            <input type="file" id="af-feed-post-video" accept="video/*" style="width:100%;">
+          </div>
+        </div>
+        <button id="af-feed-post-publish" style="width:100%; padding: 0.75rem;">Publish Post</button>
+        <div id="af-feed-post-msg" style="color:var(--accent); font-size:0.9rem; margin-top:0.5rem;"></div>
+      </div>
+      <!-- End Social Post Composer -->
+
+      <div class="af-home-feed-list" id="af-home-feed-list"></div>
+      <div class="af-home-sentinel" id="af-home-feed-sentinel" aria-hidden="true"></div>
+    </section>
+  `;
+
+  const me = await fetchCurrentUser(false);
+  const listEl = mount.querySelector('#af-home-feed-list');
+  const stateEl = mount.querySelector('#af-home-feed-state');
+  const sentinel = mount.querySelector('#af-home-feed-sentinel');
+
+  // Bind Composer Logic
+  const pubBtn = mount.querySelector('#af-feed-post-publish');
+  if (pubBtn) {
+    pubBtn.addEventListener('click', async () => {
+      const content = mount.querySelector('#af-feed-post-content').value.trim();
+      if (!content) return;
+      
+      const msg = mount.querySelector('#af-feed-post-msg');
+      msg.textContent = 'Publishing...';
+      pubBtn.disabled = true;
+
+      try {
+        let image = null, video = null;
+        const imgFile = mount.querySelector('#af-feed-post-image').files?.[0];
+        if (imgFile) {
+          const b64 = await readFilesAsDataUrls([imgFile]);
+          if (b64 && b64[0]) image = b64[0];
+        }
+        const vidFile = mount.querySelector('#af-feed-post-video').files?.[0];
+        if (vidFile) {
+          const b64 = await readFilesAsDataUrls([vidFile]);
+          if (b64 && b64[0]) video = b64[0];
+        }
+
+        const payload = {
+          title: content.substring(0, 100) + (content.length > 100 ? '...' : ''), // Auto-generate title
+          content,
+          image,
+          video,
+          status: 'published'
+        };
+
+        const res = await apiRequest('/creator/posts', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) {
+          msg.textContent = 'Post published successfully!';
+          mount.querySelector('#af-feed-post-content').value = '';
+          mount.querySelector('#af-feed-post-image').value = '';
+          mount.querySelector('#af-feed-post-video').value = '';
+          setTimeout(() => { msg.textContent = ''; renderNavHomeView(container); }, 1500); // Reload feed
+        } else {
+          msg.textContent = 'Failed to publish post.';
+        }
+      } catch (err) {
+        msg.textContent = 'Error publishing post.';
+      }
+      pubBtn.disabled = false;
+    });
+  }
+
+  if (!me) {
+    listEl.innerHTML = '<div class="af-loading">Sign in to load your personalized AFRIQORA Home Feed.</div>';
+    stateEl.textContent = 'Authentication required';
+    return;
+  }
+
+  const feedState = {
+    items: [],
+    cursor: 0,
+    hasMore: true,
+    loading: false,
+    seenImpression: new Set(),
+    seenView: new Set(),
+    watchTimers: {}
+  };
+  const navParams = getNavHashParams();
+  const requestedContentId = String(navParams.contentId || '').trim();
+  let requestFocusHandled = false;
+
+  async function track(contentId, eventType, payload = {}) {
+    try {
+      await apiRequest('/smart-reach/engagement', {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({ contentId: String(contentId), eventType, source: 'home-feed' }, payload || {}))
+      });
+    } catch (e) {}
+  }
+
+  async function refreshLikeSaveState(contentId, card, item) {
+    const likeBtn = card.querySelector('[data-action="like"]');
+    const saveBtn = card.querySelector('[data-action="save"]');
+    try {
+      const likeRes = await apiRequest('/interactions/likes?videoId=' + encodeURIComponent(String(contentId)) + '&userId=' + encodeURIComponent(String(me.id || '')), { method: 'GET' });
+      const likeData = await likeRes.json().catch(() => null);
+      if (likeData && likeBtn) likeBtn.textContent = (likeData.liked ? 'Unlike' : 'Like') + ' (' + Number(likeData.likesCount || 0) + ')';
+    } catch (e) {
+      if (likeBtn) likeBtn.textContent = 'Like';
+    }
+    try {
+      const saveRes = await apiRequest('/interactions/saves?videoId=' + encodeURIComponent(String(contentId)), { method: 'GET' });
+      const saveData = await saveRes.json().catch(() => null);
+      if (saveData && saveBtn) saveBtn.textContent = (saveData.saved ? 'Saved' : 'Save') + ' (' + Number(saveData.savesCount || 0) + ')';
+    } catch (e) {
+      if (saveBtn) saveBtn.textContent = 'Save';
+    }
+    const stats = card.querySelector('[data-home-stats="' + String(contentId) + '"]');
+    if (stats && item) {
+      stats.textContent = 'Views: ' + Number((item.engagement && item.engagement.views) || (item.smartReach && item.smartReach.views) || 0)
+        + ' · Likes: ' + Number((item.engagement && item.engagement.likes) || 0)
+        + ' · Comments: ' + Number((item.engagement && item.engagement.comments) || 0)
+        + ' · Shares: ' + Number((item.engagement && item.engagement.shares) || 0)
+        + ' · Saves: ' + Number((item.engagement && item.engagement.saves) || 0);
+    }
+  }
+
+  async function loadComments(contentId, card) {
+    const list = card.querySelector('[data-home-comments-list="' + String(contentId) + '"]');
+    if (!list) return;
+    list.innerHTML = '<div class="af-loading">Loading comments...</div>';
+    try {
+      const res = await apiRequest('/comments?videoId=' + encodeURIComponent(String(contentId)), { method: 'GET' });
+      const data = await res.json().catch(() => null);
+      if (!data || !Array.isArray(data.comments)) {
+        list.innerHTML = '<div class="af-loading">Unable to load comments.</div>';
+        return;
+      }
+      if (!data.comments.length) {
+        list.innerHTML = '<div class="af-loading">No comments yet.</div>';
+        return;
+      }
+      list.innerHTML = data.comments.map((c) => `
+        <div class="af-home-comment-item" data-comment-id="${escapeHtml(c.id || '')}">
+          <p style="margin:0;"><strong>${escapeHtml(c.authorId || 'User')}:</strong> ${escapeHtml(c.text || '')}</p>
+          <button type="button" class="af-search-pill" data-reply-comment="${escapeHtml(c.id || '')}" style="margin-top:0.2rem;">Reply</button>
+        </div>
+      `).join('');
+      list.querySelectorAll('[data-reply-comment]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const parentCommentId = btn.getAttribute('data-reply-comment');
+          const reply = prompt('Reply to comment:', '');
+          const text = String(reply || '').trim();
+          if (!text) return;
+          const res = await apiRequest('/comments', {
+            method: 'POST',
+            body: JSON.stringify({ videoId: String(contentId), authorId: String(me.id || ''), text, parentCommentId })
+          });
+          const result = await res.json().catch(() => null);
+          if (result && result.ok) {
+            item.engagement = item.engagement || {};
+            item.engagement.comments = Number(item.engagement.comments || 0) + 1;
+            await refreshLikeSaveState(contentId, card, item);
+            await loadComments(contentId, card);
+            refreshNotificationBadges();
+          }
+        });
+      });
+    } catch (e) {
+      list.innerHTML = '<div class="af-loading">Could not load comments.</div>';
+    }
+  }
+
+  function wireCardInteractions(card, item) {
+    const contentId = String(item.id);
+    const commentsWrap = card.querySelector('[data-home-comments="' + contentId + '"]');
+    const commentForm = card.querySelector('[data-home-comment-form="' + contentId + '"]');
+    const authorBtn = card.querySelector('[data-home-author]');
+    if (authorBtn) {
+      authorBtn.addEventListener('click', async () => {
+        await track(contentId, 'profile_visit');
+        if (item.ownerAfriqoraId) {
+          window.location.hash = '#/profile';
+        }
+      });
+    }
+
+    card.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const action = btn.getAttribute('data-action');
+        if (action === 'comment-toggle') {
+          commentsWrap.classList.toggle('open');
+          if (commentsWrap.classList.contains('open')) loadComments(contentId, card);
+          return;
+        }
+        if (action === 'like') {
+          const liking = !btn.textContent.toLowerCase().includes('unlike');
+          const endpoint = liking ? '/interactions/like' : '/interactions/unlike';
+          const res = await apiRequest(endpoint, { method: 'POST', body: JSON.stringify({ videoId: contentId, userId: me.id }) });
+          const data = await res.json().catch(() => null);
+          if (data && data.ok) {
+            item.engagement = item.engagement || {};
+            item.engagement.likes = Number(data.likesCount || item.engagement.likes || 0);
+            await refreshLikeSaveState(contentId, card, item);
+          }
+          return;
+        }
+        if (action === 'share') {
+          await apiRequest('/interactions/share', { method: 'POST', body: JSON.stringify({ videoId: contentId, userId: me.id, platform: 'native' }) });
+          if (navigator.clipboard) {
+            try { await navigator.clipboard.writeText(window.location.href.split('#')[0] + '#/home'); } catch (e) {}
+          }
+          item.engagement = item.engagement || {};
+          item.engagement.shares = Number(item.engagement.shares || 0) + 1;
+          await refreshLikeSaveState(contentId, card, item);
+          return;
+        }
+        if (action === 'save') {
+          const saved = btn.textContent.toLowerCase().includes('saved');
+          const endpoint = saved ? '/interactions/unsave' : '/interactions/save';
+          const res = await apiRequest(endpoint, { method: 'POST', body: JSON.stringify({ videoId: contentId }) });
+          const data = await res.json().catch(() => null);
+          if (data && data.ok) {
+            item.engagement = item.engagement || {};
+            item.engagement.saves = Number(data.savesCount || item.engagement.saves || 0);
+            await refreshLikeSaveState(contentId, card, item);
+          }
+          return;
+        }
+        if (action === 'report') {
+          const reason = prompt('Report reason (optional):', 'inappropriate') || 'unspecified';
+          await apiRequest('/content/report', { method: 'POST', body: JSON.stringify({ contentId, reason }) });
+          btn.textContent = 'Reported';
+          btn.disabled = true;
+          return;
+        }
+        if (action === 'not-interested') {
+          await apiRequest('/content/not-interested', { method: 'POST', body: JSON.stringify({ contentId, reason: 'viewer-feedback' }) });
+          card.remove();
+          feedState.items = feedState.items.filter((x) => String(x.id) !== contentId);
+          if (!feedState.items.length && !feedState.loading && !feedState.hasMore) {
+            listEl.innerHTML = '<div class="af-loading">No content left in your feed after preferences filtering.</div>';
+          }
+        }
+      });
+    });
+
+    if (commentForm) {
+      commentForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = commentForm.querySelector('input');
+        const text = String(input.value || '').trim();
+        if (!text) return;
+        const res = await apiRequest('/comments', { method: 'POST', body: JSON.stringify({ videoId: contentId, authorId: me.id, text }) });
+        const data = await res.json().catch(() => null);
+        if (data && data.ok) {
+          input.value = '';
+          item.engagement = item.engagement || {};
+          item.engagement.comments = Number(item.engagement.comments || 0) + 1;
+          await refreshLikeSaveState(contentId, card, item);
+          await loadComments(contentId, card);
+        }
+      });
+    }
+
+    const loadBtn = card.querySelector('[data-video-load="' + contentId + '"]');
+    const video = card.querySelector('video[data-feed-video]');
+    if (loadBtn && video) {
+      loadBtn.addEventListener('click', async () => {
+        if (!video.getAttribute('src')) video.setAttribute('src', video.getAttribute('data-src') || '');
+        try { await video.play(); } catch (e) {}
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Video Ready';
+      });
+      video.addEventListener('timeupdate', async () => {
+        const now = Date.now();
+        if (!feedState.watchTimers[contentId]) feedState.watchTimers[contentId] = now;
+        const elapsed = now - feedState.watchTimers[contentId];
+        if (elapsed >= 7000) {
+          feedState.watchTimers[contentId] = now;
+          await track(contentId, 'watch_time', { watchTimeMs: elapsed });
+        }
+        if (!feedState.seenView.has(contentId) && video.currentTime >= 5) {
+          feedState.seenView.add(contentId);
+          await track(contentId, 'view');
+        }
+      });
+      video.addEventListener('ended', async () => {
+        await track(contentId, 'completion');
+      });
+    }
+
+    refreshLikeSaveState(contentId, card, item);
+  }
+
+  const cardObserver = new IntersectionObserver((entries) => {
+    entries.forEach(async (entry) => {
+      if (!entry.isIntersecting) return;
+      const card = entry.target;
+      const contentId = card.getAttribute('data-home-content-id');
+      if (!contentId || feedState.seenImpression.has(contentId)) return;
+      feedState.seenImpression.add(contentId);
+      await track(contentId, 'impression');
+    });
+  }, { threshold: 0.5 });
+
+  function appendItems(items) {
+    const frag = document.createDocumentFragment();
+    items.forEach((item) => {
+      const holder = document.createElement('div');
+      holder.innerHTML = homeFeedCardHtml(item);
+      const card = holder.firstElementChild;
+      if (!card) return;
+      frag.appendChild(card);
+      wireCardInteractions(card, item);
+      cardObserver.observe(card);
+    });
+    listEl.appendChild(frag);
+
+    if (!requestFocusHandled && requestedContentId) {
+      const target = listEl.querySelector('[data-home-content-id="' + CSS.escape(requestedContentId) + '"]');
+      if (target) {
+        requestFocusHandled = true;
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.style.boxShadow = '0 0 0 2px rgba(230,184,92,0.7)';
+        setTimeout(() => { target.style.boxShadow = ''; }, 1800);
+      }
+    }
+  }
+
+  async function loadPage() {
+    if (feedState.loading || !feedState.hasMore) return;
+    feedState.loading = true;
+    stateEl.textContent = feedState.items.length ? 'Loading more...' : 'Loading feed...';
+    try {
+      const q = '/feed/home?limit=' + encodeURIComponent(String(AFRIQORA_HOME_FEED_PAGE_SIZE)) + '&cursor=' + encodeURIComponent(String(feedState.cursor || 0));
+      const res = await apiRequest(q, { method: 'GET' });
+      if (!res.ok) {
+        stateEl.textContent = 'Could not load feed';
+        if (!feedState.items.length) listEl.innerHTML = '<div class="af-loading">Unable to load Home Feed right now.</div>';
+        feedState.loading = false;
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (!data || !data.ok || !Array.isArray(data.items)) {
+        stateEl.textContent = 'Feed format error';
+        if (!feedState.items.length) listEl.innerHTML = '<div class="af-loading">Feed response was invalid.</div>';
+        feedState.loading = false;
+        return;
+      }
+      if (!data.items.length && !feedState.items.length) {
+        listEl.innerHTML = '<div class="af-loading">Your AFRIQORA Home Feed is empty. Follow creators or publish content to personalize it.</div>';
+      } else {
+        appendItems(data.items);
+      }
+      feedState.items = feedState.items.concat(data.items);
+      feedState.hasMore = !!data.hasMore;
+      feedState.cursor = typeof data.nextCursor === 'number' ? data.nextCursor : (feedState.cursor + data.items.length);
+      stateEl.textContent = feedState.hasMore ? 'Scroll for more' : 'Feed up to date';
+    } catch (e) {
+      stateEl.textContent = 'Feed request failed';
+      if (!feedState.items.length) listEl.innerHTML = '<div class="af-loading">Network issue while loading feed.</div>';
+    }
+    feedState.loading = false;
+  }
+
+  const sentinelObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) loadPage();
+    });
+  }, { rootMargin: '280px 0px' });
+
+  sentinelObserver.observe(sentinel);
+  await loadPage();
+}
+
+function ensureSearchViewStyles() {
+  if (document.getElementById('afriqora-search-style')) return;
+  const style = document.createElement('style');
+  style.id = 'afriqora-search-style';
+  style.textContent = `
+    .af-search-shell { border: 1px solid rgba(255,255,255,0.13); border-radius: 16px; background: rgba(9, 24, 37, 0.7); padding: 0.78rem; }
+    .af-search-head { display: grid; gap: 0.56rem; }
+    .af-search-input-wrap { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
+    .af-search-input-wrap input {
+      min-width: 0;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 11px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 0.58rem 0.7rem;
+    }
+    .af-search-input-wrap button {
+      border: 1px solid rgba(230, 184, 92, 0.55);
+      border-radius: 11px;
+      background: linear-gradient(120deg, rgba(21,184,166,0.28), rgba(230,184,92,0.23));
+      color: #fff;
+      font-weight: 600;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+    }
+    .af-search-filter-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .af-search-chip {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px;
+      padding: 0.24rem 0.58rem;
+      font-size: 0.74rem;
+      background: rgba(255,255,255,0.06);
+      color: #e9f4ff;
+      cursor: pointer;
+      user-select: none;
+    }
+    .af-search-chip.active {
+      border-color: rgba(230,184,92,0.72);
+      background: linear-gradient(120deg, rgba(21,184,166,0.24), rgba(230,184,92,0.21));
+      color: #fff8e8;
+    }
+    .af-search-suggest-box,
+    .af-search-recent-box,
+    .af-search-results {
+      margin-top: 0.66rem;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      padding: 0.56rem;
+    }
+    .af-search-suggest-list,
+    .af-search-recent-list { display: flex; flex-wrap: wrap; gap: 0.38rem; }
+    .af-search-pill {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      color: #e9f4ff;
+      font-size: 0.74rem;
+      padding: 0.2rem 0.52rem;
+      cursor: pointer;
+    }
+    .af-search-results-head { display: flex; justify-content: space-between; gap: 0.45rem; align-items: center; margin-bottom: 0.4rem; }
+    .af-search-results-meta { font-size: 0.78rem; color: rgba(218,233,245,0.82); }
+    .af-search-group { margin-top: 0.52rem; }
+    .af-search-group h4 { margin: 0 0 0.36rem; font-size: 0.84rem; color: #f3e6c7; letter-spacing: 0.02em; }
+    .af-search-item {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 11px;
+      background: rgba(255,255,255,0.04);
+      padding: 0.52rem;
+      margin-bottom: 0.44rem;
+      cursor: pointer;
+    }
+    .af-search-item p { margin: 0.2rem 0; font-size: 0.83rem; }
+    .af-search-item-title { font-weight: 700; color: #fff; }
+    .af-search-item-meta { color: rgba(212,231,246,0.77); }
+    .af-search-actions { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+    .af-search-actions button {
+      border: 1px solid rgba(230,184,92,0.55);
+      border-radius: 10px;
+      background: linear-gradient(120deg, rgba(21,184,166,0.28), rgba(230,184,92,0.23));
+      color: #fff;
+      cursor: pointer;
+      padding: 0.44rem 0.68rem;
+      font-weight: 600;
+    }
+    .af-search-error { color: #ffd3c7; }
+    .af-search-empty { color: rgba(223,238,250,0.84); }
+    @media (max-width: 740px) {
+      .af-search-shell { padding: 0.62rem; }
+      .af-search-input-wrap { grid-template-columns: 1fr; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+async function renderNavSearchView(container) {
+  ensureSearchViewStyles();
+  const SEARCH_RECENT_KEY = 'afriqoraSearchRecentV1';
+  const SEARCH_TYPES = [
+    { key: 'people', label: 'People' },
+    { key: 'businesses', label: 'Businesses' },
+    { key: 'services', label: 'Services' },
+    { key: 'posts', label: 'Posts' },
+    { key: 'videos', label: 'Videos' },
+    { key: 'content', label: 'Content' },
+    { key: 'categories', label: 'Categories' }
+  ];
+
+  container.innerHTML = `
+    <section class="af-search-shell">
+      <div class="af-search-head">
+        <h3 style="margin:0;">AFRIQORA Search</h3>
+        <p class="af-view-hint" style="margin:0;">Search people, businesses, services, posts, videos, and categories with location-aware relevance.</p>
+        <div class="af-search-input-wrap">
+          <input type="text" id="af-nav-search-input" placeholder="Search e.g. electrician Edenvale" aria-label="AFRIQORA search query" autocomplete="off">
+          <button type="button" id="af-nav-search-btn">Search</button>
+        </div>
+        <div class="af-search-filter-row" id="af-search-filters"></div>
+      </div>
+      <div class="af-search-suggest-box" id="af-search-suggest-box" hidden>
+        <p class="af-search-results-meta" style="margin:0 0 0.35rem;">Suggestions</p>
+        <div class="af-search-suggest-list" id="af-search-suggest-list"></div>
+      </div>
+      <div class="af-search-recent-box" id="af-search-recent-box">
+        <div class="af-search-results-head">
+          <p class="af-search-results-meta" style="margin:0;">Recent searches</p>
+          <button type="button" id="af-search-clear-recent" class="af-search-pill">Clear</button>
+        </div>
+        <div class="af-search-recent-list" id="af-search-recent-list"></div>
+      </div>
+      <div class="af-search-results" id="af-search-results">
+        <div class="af-search-empty">Start typing to search AFRIQORA.</div>
+      </div>
+    </section>
+  `;
+
+  const input = container.querySelector('#af-nav-search-input');
+  const btn = container.querySelector('#af-nav-search-btn');
+  const filtersEl = container.querySelector('#af-search-filters');
+  const suggestBox = container.querySelector('#af-search-suggest-box');
+  const suggestList = container.querySelector('#af-search-suggest-list');
+  const recentBox = container.querySelector('#af-search-recent-box');
+  const recentList = container.querySelector('#af-search-recent-list');
+  const clearRecentBtn = container.querySelector('#af-search-clear-recent');
+  const resultsEl = container.querySelector('#af-search-results');
+
+  const me = await fetchCurrentUser(false);
+  const settings = loadAppSettings();
+  const state = {
+    q: '',
+    cursor: 0,
+    hasMore: false,
+    loading: false,
+    items: [],
+    groups: {},
+    activeTypes: new Set(SEARCH_TYPES.map((x) => x.key)),
+    debounceTimer: null
+  };
+
+  if (settings && settings.search && settings.search.includeServices === false) state.activeTypes.delete('services');
+
+  function recentStorageKey() {
+    return SEARCH_RECENT_KEY + ':' + String((me && me.id) || 'guest');
+  }
+
+  function loadRecent() {
+    try {
+      const raw = localStorage.getItem(recentStorageKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 12) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRecent(items) {
+    try { localStorage.setItem(recentStorageKey(), JSON.stringify((items || []).slice(0, 12))); } catch (e) {}
+  }
+
+  function pushRecent(q) {
+    const value = String(q || '').trim();
+    if (!value) return;
+    const list = loadRecent().filter((x) => String(x).toLowerCase() !== value.toLowerCase());
+    list.unshift(value);
+    saveRecent(list);
+    renderRecent();
+  }
+
+  function renderRecent() {
+    const list = loadRecent();
+    if (!list.length) {
+      recentList.innerHTML = '<span class="af-search-empty">No recent searches yet.</span>';
+      clearRecentBtn.hidden = true;
+      return;
+    }
+    clearRecentBtn.hidden = false;
+    recentList.innerHTML = list.map((q) => `<button type="button" class="af-search-pill" data-recent-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join('');
+    recentList.querySelectorAll('[data-recent-q]').forEach((el) => {
+      el.addEventListener('click', () => {
+        input.value = el.getAttribute('data-recent-q') || '';
+        triggerSearch(false, true);
+      });
+    });
+  }
+
+  function renderFilters() {
+    filtersEl.innerHTML = SEARCH_TYPES.map((t) => `<button type="button" class="af-search-chip ${state.activeTypes.has(t.key) ? 'active' : ''}" data-type="${t.key}">${escapeHtml(t.label)}</button>`).join('');
+    filtersEl.querySelectorAll('[data-type]').forEach((btnEl) => {
+      btnEl.addEventListener('click', () => {
+        const key = btnEl.getAttribute('data-type');
+        if (!key) return;
+        if (state.activeTypes.has(key)) state.activeTypes.delete(key);
+        else state.activeTypes.add(key);
+        if (!state.activeTypes.size) state.activeTypes = new Set(['people']);
+        renderFilters();
+        triggerSearch(false, true);
+      });
+    });
+  }
+
+  function groupLabel(type) {
+    const found = SEARCH_TYPES.find((x) => x.key === type);
+    return found ? found.label : type;
+  }
+
+  function groupedItems(items) {
+    const out = {};
+    (items || []).forEach((item) => {
+      const k = item.type || 'other';
+      out[k] = out[k] || [];
+      out[k].push(item);
+    });
+    return out;
+  }
+
+  function openResult(item) {
+    if (!item) return;
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.6)';
+    overlay.style.zIndex = '999999';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    const panel = document.createElement('div');
+    panel.style.width = 'min(760px,95%)';
+    panel.style.maxHeight = '90%';
+    panel.style.overflow = 'auto';
+    panel.style.borderRadius = '12px';
+    panel.style.border = '1px solid rgba(255,255,255,0.14)';
+    panel.style.background = 'rgba(10, 26, 40, 0.98)';
+    panel.style.color = '#fff';
+    panel.style.padding = '0.9rem';
+    const media = item.preview || {};
+    panel.innerHTML = `
+      <h3 style="margin:0 0 0.35rem;">${escapeHtml(item.title || 'Result')}</h3>
+      <p style="margin:0.15rem 0;color:rgba(222,238,248,0.86);">${escapeHtml(groupLabel(item.type))}${item.subtitle ? ' • ' + escapeHtml(item.subtitle) : ''}</p>
+      <p style="margin:0.35rem 0;color:rgba(222,238,248,0.82);">Category: ${escapeHtml(item.category || 'n/a')} • Location: ${escapeHtml(item.location || 'n/a')}</p>
+      ${media.excerpt ? `<p style="white-space:pre-wrap;">${escapeHtml(media.excerpt)}</p>` : ''}
+      ${media.image ? `<img src="${escapeHtml(media.image)}" alt="Search result image" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.15);">` : ''}
+      ${media.video ? `<video src="${escapeHtml(media.video)}" controls preload="none" style="margin-top:0.45rem;width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.15);"></video>` : ''}
+      <div style="display:flex;gap:0.45rem;justify-content:flex-end;margin-top:0.7rem;">
+        ${item.type === 'people' ? '<button type="button" class="af-search-pill" data-send-connection="1">Connect</button>' : ''}
+        ${(item.type === 'businesses' || item.type === 'services') ? '<button type="button" class="af-search-pill" data-send-enquiry="1">Send enquiry</button>' : ''}
+        <button type="button" class="af-search-pill" data-open-route="1">Open</button>
+        <button type="button" class="af-search-pill" data-close="1">Close</button>
+      </div>
+    `;
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    panel.querySelector('[data-close="1"]').addEventListener('click', () => {
+      try { document.body.removeChild(overlay); } catch (e) {}
+    });
+    panel.querySelector('[data-open-route="1"]').addEventListener('click', async () => {
+      try { document.body.removeChild(overlay); } catch (e) {}
+      
+      if (item.type === 'people' || item.type === 'businesses') {
+         // For businesses, use ownerAfriqoraId or ownerUserId. For people, use subtitle or id.
+         const targetId = item.type === 'businesses' ? (item.ownerAfriqoraId || item.ownerUserId || item.id) : ((item.subtitle && item.subtitle.includes('@') ? item.subtitle.replace('@', '') : item.subtitle) || item.id);
+         switchTab('profile');
+         renderNavProfileView(document.getElementById('af-tab-profile'), targetId);
+      } else {
+         window.location.hash = '#/home';
+      }
+    });
+    const enquiryBtn = panel.querySelector('[data-send-enquiry="1"]');
+    if (enquiryBtn) {
+      enquiryBtn.addEventListener('click', async () => {
+        if (!me) {
+          alert('Sign in to send a business enquiry.');
+          return;
+        }
+        if (!item.businessId) {
+          alert('Business enquiry is not available for this item.');
+          return;
+        }
+        const text = prompt('Describe your enquiry:', 'I would like to learn more about your service.');
+        const message = String(text || '').trim();
+        if (!message) return;
+        try {
+          const res = await apiRequest('/business/enquiries', {
+            method: 'POST',
+            body: JSON.stringify({ businessId: String(item.businessId), message, contactMode: 'search' })
+          });
+          const data = await res.json().catch(() => null);
+          if (res.ok && data && data.ok) alert('Enquiry sent successfully.');
+          else alert('Unable to send enquiry right now.');
+        } catch (e) {
+          alert('Network issue while sending enquiry.');
+        }
+      });
+    }
+
+    const connectBtn = panel.querySelector('[data-send-connection="1"]');
+    if (connectBtn) {
+      connectBtn.addEventListener('click', async () => {
+        if (!me) {
+          alert('Sign in to send a connection request.');
+          return;
+        }
+        try {
+          const res = await apiRequest('/connections/request', {
+            method: 'POST',
+            body: JSON.stringify({ targetUserId: String(item.id || '') })
+          });
+          const data = await res.json().catch(() => null);
+          if (res.ok && data && data.ok) alert('Connection request sent.');
+          else alert((data && data.error) ? data.error : 'Unable to send connection request.');
+        } catch (e) {
+          alert('Network issue while sending connection request.');
+        }
+      });
+    }
+  }
+
+  function renderResults() {
+    if (state.loading && !state.items.length) {
+      resultsEl.innerHTML = '<div class="af-loading">Searching AFRIQORA...</div>';
+      return;
+    }
+    if (!state.items.length) {
+      let fallbackHtml = '<div class="af-search-empty">No direct results found.</div>';
+      if (state.suggestions && state.suggestions.length) {
+        fallbackHtml += '<div class="af-search-suggestions" style="margin-top:20px; padding: 10px; background: var(--bg-alt); border-radius: 8px;">';
+        fallbackHtml += '<p style="margin: 0 0 10px 0; font-weight: 500;">Try these alternatives:</p>';
+        state.suggestions.forEach(s => {
+          fallbackHtml += `<div class="af-search-suggest-item" style="cursor:pointer; padding: 8px; border-bottom: 1px solid var(--border);" onclick="document.getElementById('af-search-input').value = '${escapeHtml(s)}'; document.getElementById('af-search-btn').click();">${escapeHtml(s)}</div>`;
+        });
+        fallbackHtml += '</div>';
+      }
+      if (state.relatedCategories && state.relatedCategories.length) {
+        fallbackHtml += '<div class="af-search-categories" style="margin-top:20px; padding: 10px;">';
+        fallbackHtml += '<p style="margin: 0 0 10px 0; font-weight: 500;">Related Categories:</p>';
+        state.relatedCategories.forEach(c => {
+          fallbackHtml += `<span style="display: inline-block; padding: 6px 12px; margin: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; cursor: pointer;" onclick="document.getElementById('af-search-input').value = '${escapeHtml(c)}'; document.getElementById('af-search-btn').click();">${escapeHtml(c)}</span>`;
+        });
+        fallbackHtml += '</div>';
+      }
+      resultsEl.innerHTML = fallbackHtml;
+      return;
+    }
+    const grouped = groupedItems(state.items);
+    const order = SEARCH_TYPES.map((x) => x.key);
+    const groupsHtml = order
+      .filter((type) => grouped[type] && grouped[type].length)
+      .map((type) => {
+        const cards = grouped[type].map((item) => `
+          <article class="af-search-item" data-result-id="${escapeHtml(item.id)}" data-result-type="${escapeHtml(item.type)}">
+            <p class="af-search-item-title">${escapeHtml(item.title || 'Untitled')}</p>
+            <p class="af-search-item-meta">${escapeHtml(item.subtitle || '')}</p>
+            <p class="af-search-item-meta">Category: ${escapeHtml(item.category || 'n/a')} • Location: ${escapeHtml(item.location || 'n/a')} • Score: ${Number(item.score || 0).toFixed(3)}</p>
+          </article>
+        `).join('');
+        return `<section class="af-search-group"><h4>${escapeHtml(groupLabel(type))} (${grouped[type].length})</h4>${cards}</section>`;
+      }).join('');
+
+    const activeSummary = Array.from(state.activeTypes).map(groupLabel).join(', ');
+    const total = Object.values(state.groups || {}).reduce((acc, n) => acc + Number(n || 0), 0);
+    resultsEl.innerHTML = `
+      <div class="af-search-results-head">
+        <p class="af-search-results-meta" style="margin:0;">${total} result(s) • Filters: ${escapeHtml(activeSummary || 'none')}</p>
+        <p class="af-search-results-meta" style="margin:0;">${state.hasMore ? 'More available' : 'End of results'}</p>
+      </div>
+      ${groupsHtml}
+      <div class="af-search-actions">
+        ${state.hasMore ? '<button type="button" id="af-search-load-more">Load more</button>' : ''}
+      </div>
+    `;
+
+    resultsEl.querySelectorAll('[data-result-id][data-result-type]').forEach((node) => {
+      node.addEventListener('click', () => {
+        const id = node.getAttribute('data-result-id');
+        const type = node.getAttribute('data-result-type');
+        const item = state.items.find((x) => String(x.id) === String(id) && String(x.type) === String(type));
+        openResult(item);
+      });
+    });
+
+    const moreBtn = resultsEl.querySelector('#af-search-load-more');
+    if (moreBtn) {
+      moreBtn.addEventListener('click', () => triggerSearch(true, true));
+    }
+  }
+
+  async function fetchSuggestions() {
+    const q = String(input.value || '').trim();
+    if (q.length < 2) {
+      suggestBox.hidden = true;
+      suggestList.innerHTML = '';
+      return;
+    }
+    try {
+      const res = await apiRequest('/search/suggestions?q=' + encodeURIComponent(q) + '&limit=8', { method: 'GET' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok || !Array.isArray(data.suggestions) || !data.suggestions.length) {
+        suggestBox.hidden = true;
+        suggestList.innerHTML = '';
+        return;
+      }
+      suggestList.innerHTML = data.suggestions.map((s) => {
+        const label = s.kind === 'query' ? s.text : ((s.type ? (s.type + ': ') : '') + s.text + (s.subtitle ? (' • ' + s.subtitle) : ''));
+        return `<button type="button" class="af-search-pill" data-suggest="${escapeHtml(s.text || '')}">${escapeHtml(label)}</button>`;
+      }).join('');
+      suggestBox.hidden = false;
+      suggestList.querySelectorAll('[data-suggest]').forEach((el) => {
+        el.addEventListener('click', () => {
+          input.value = el.getAttribute('data-suggest') || '';
+          suggestBox.hidden = true;
+          triggerSearch(false, true);
+        });
+      });
+    } catch (e) {
+      suggestBox.hidden = true;
+    }
+  }
+
+  async function triggerSearch(append = false, saveRecentHistory = true) {
+    const q = String(input.value || '').trim();
+    if (!q) {
+      state.items = [];
+      state.groups = {};
+      state.cursor = 0;
+      state.hasMore = false;
+      resultsEl.innerHTML = '<div class="af-loading af-search-error">Enter a search term to begin.</div>';
+      recentBox.hidden = false;
+      return;
+    }
+
+    if (!append) {
+      state.cursor = 0;
+      state.items = [];
+      state.hasMore = false;
+      state.groups = {};
+    }
+
+    state.loading = true;
+    renderResults();
+    const types = Array.from(state.activeTypes).join(',');
+    let locParam = '';
+    if (q.toLowerCase().includes('near me')) {
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+        });
+        locParam = `&lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`;
+      } catch(e) {
+        // Geolocation failed or denied
+      }
+    }
+    
+    const url = '/search?q=' + encodeURIComponent(q)
+      + '&types=' + encodeURIComponent(types)
+      + '&limit=12'
+      + '&cursor=' + encodeURIComponent(String(state.cursor || 0))
+      + locParam;
+    try {
+      const res = await apiRequest(url, { method: 'GET' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok || !Array.isArray(data.items)) {
+        const msg = data && data.error ? data.error : 'Search request failed';
+        resultsEl.innerHTML = '<div class="af-loading af-search-error">' + escapeHtml(msg) + '</div>';
+        state.loading = false;
+        return;
+      }
+      state.groups = data.groups || {};
+      state.hasMore = !!data.hasMore;
+      state.cursor = typeof data.nextCursor === 'number' ? data.nextCursor : 0;
+      state.items = append ? state.items.concat(data.items) : data.items.slice();
+      state.relatedCategories = data.relatedCategories || [];
+      state.suggestions = data.suggestions || [];
+      state.loading = false;
+      renderResults();
+      if (!append && saveRecentHistory) pushRecent(q);
+      recentBox.hidden = false;
+    } catch (e) {
+      state.loading = false;
+      resultsEl.innerHTML = '<div class="af-loading af-search-error">Network issue while searching.</div>';
+    }
+  }
+
+  function debouncedSuggestAndSearch() {
+    if (state.debounceTimer) clearTimeout(state.debounceTimer);
+    state.debounceTimer = setTimeout(async () => {
+      await fetchSuggestions();
+    }, 280);
+  }
+
+  clearRecentBtn.addEventListener('click', () => {
+    saveRecent([]);
+    renderRecent();
+  });
+  btn.addEventListener('click', () => triggerSearch(false, true));
+  input.addEventListener('input', debouncedSuggestAndSearch);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      triggerSearch(false, true);
+    }
+  });
+
+  renderFilters();
+  renderRecent();
+  renderResults();
+}
+
+async function renderNavActivityView(container) {
+  container.innerHTML = '<div class="af-view-card"><h3>Recent Activity</h3><p class="af-view-hint">Loading recent updates from your AFRIQORA content.</p><div class="af-loading" aria-live="polite">Loading activity feed...</div></div>';
+
+  const me = await fetchCurrentUser(false);
+  if (me) {
+    try {
+      const res = await apiRequest('/feed/home?limit=12', { method: 'GET' });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.ok && Array.isArray(data.items) && data.items.length) {
+        const listHtml = data.items.map((item) => {
+          const authorRef = item.ownerUsername || item.ownerAfriqoraId;
+          return `
+          <article class="af-view-item" data-post-id="${escapeHtml(item.id)}">
+            <p class="af-author-link" data-username="${escapeHtml(authorRef)}" style="color:var(--accent);font-size:0.85rem;margin-bottom:0.25rem;cursor:pointer;font-weight:600;">@${escapeHtml(authorRef)} &bull; ${escapeHtml(item.ownerDisplayName || 'Creator')}</p>
+            <p><strong>${escapeHtml(item.title || 'Post')}</strong></p>
+            <p style="white-space:pre-wrap;">${escapeHtml(item.content || '')}</p>
+            ${item.image ? `<img src="${escapeHtml(item.image)}" style="max-width:100%;border-radius:6px;margin-top:0.5rem;" alt="Post image">` : ''}
+            ${item.video ? `<video src="${escapeHtml(item.video)}" controls style="max-width:100%;border-radius:6px;margin-top:0.5rem;"></video>` : ''}
+            <p class="af-message-meta" style="margin-top:0.5rem;">${escapeHtml(formatIsoDate(item.publishedAt || item.createdAt))}</p>
+            <div style="display:flex;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(255,255,255,0.1);">
+              <button class="af-action-like" data-id="${escapeHtml(item.id)}" style="background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.2);padding:0.4rem 0.8rem;border-radius:4px;cursor:pointer;">Like</button>
+              <button class="af-action-comment" data-id="${escapeHtml(item.id)}" style="background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.2);padding:0.4rem 0.8rem;border-radius:4px;cursor:pointer;">Comment</button>
+              <button class="af-action-share" data-id="${escapeHtml(item.id)}" style="background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.2);padding:0.4rem 0.8rem;border-radius:4px;cursor:pointer;">Share</button>
+            </div>
+          </article>
+        `}).join('');
+        container.innerHTML = `<div class="af-view-card"><h3>Smart Reach Home Feed</h3><p class="af-view-hint">Personalized feed ordered by relevance and genuine engagement.</p><div class="af-view-grid" style="margin-top:0.65rem;">${listHtml}</div></div>`;
+        
+        container.querySelectorAll('.af-author-link').forEach(link => {
+          link.addEventListener('click', () => {
+             const uname = link.getAttribute('data-username');
+             if (uname) {
+                switchTab('profile');
+                renderNavProfileView(document.getElementById('af-tab-profile'), uname);
+             }
+          });
+        });
+        
+        container.querySelectorAll('.af-action-like').forEach(btn => {
+          btn.addEventListener('click', async () => {
+             const res = await apiRequest('/interactions/like', { method:'POST', body: JSON.stringify({ videoId: btn.dataset.id, userId: me.id }) });
+             if (res.ok) { btn.textContent = 'Liked'; btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
+          });
+        });
+        container.querySelectorAll('.af-action-comment').forEach(btn => {
+          btn.addEventListener('click', async () => {
+             const txt = prompt('Enter your comment:');
+             if (!txt) return;
+             const res = await apiRequest('/comments', { method:'POST', body: JSON.stringify({ videoId: btn.dataset.id, authorId: me.id, text: txt }) });
+             if (res.ok) { alert('Comment posted!'); btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
+          });
+        });
+        container.querySelectorAll('.af-action-share').forEach(btn => {
+          btn.addEventListener('click', async () => {
+             const res = await apiRequest('/interactions/share', { method:'POST', body: JSON.stringify({ videoId: btn.dataset.id, userId: me.id, platform:'copy' }) });
+             if (res.ok) { alert('Link copied to clipboard!'); btn.textContent = 'Shared'; btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
+          });
+        });
+        return;
+      }
+    } catch (e) {}
+  }
+
+  const feed = [];
+  getSavedPosts().forEach((p) => feed.push({ when: p.updatedAt || p.createdAt, title: p.title || 'Post', text: 'Creator post published or updated' }));
+  getSavedMarketplaceListings().forEach((m) => feed.push({ when: m.createdAt, title: m.name || 'Listing', text: 'Marketplace listing published' }));
+  getSavedBusinessListings().forEach((b) => feed.push({ when: b.submittedAt, title: b.name || 'Business', text: 'Business profile registered or updated' }));
+  feed.sort((a, b) => new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime());
+  const listHtml = feed.length
+    ? feed.slice(0, 35).map((x) => `<article class="af-view-item"><p><strong>${escapeHtml(x.title)}</strong></p><p>${escapeHtml(x.text)}</p><p class="af-message-meta">${escapeHtml(formatIsoDate(x.when))}</p></article>`).join('')
+    : '<div class="af-loading">No activity yet. Publish a post or create a listing to populate this feed.</div>';
+  container.innerHTML = `<div class="af-view-card"><h3>Recent Activity</h3><p class="af-view-hint">Real activity from business listings, creator posts and marketplace updates.</p><div class="af-view-grid" style="margin-top:0.65rem;">${listHtml}</div></div>`;
+}
+
+async function renderNavNotificationsView(container) {
+  container.innerHTML = '<div class="af-view-card"><h3>Notifications</h3><div class="af-loading" aria-live="polite">Loading notifications...</div></div>';
+  const me = await fetchCurrentUser(false);
+  if (!me) {
+    container.innerHTML = '<div class="af-view-card"><h3>Notifications</h3><p class="af-view-hint">Sign in to view your notifications.</p></div>';
+    return;
+  }
+
+  const state = { items: [], cursor: 0, hasMore: true, loading: false, unreadCount: 0 };
+
+  function iconForCategory(category) {
+    const map = {
+      social: 'activity',
+      connections: 'user',
+      messages: 'message',
+      business: 'home',
+      recommendation: 'search',
+      system: 'settings'
+    };
+    return primaryNavIcon(map[String(category || '').toLowerCase()] || 'bell');
+  }
+
+  function render() {
+    const itemsHtml = state.items.map((n) => {
+      const actorLabel = n.actorDisplayName ? ('Actor: ' + String(n.actorDisplayName)) : (n.actorUserId ? ('Actor: ' + String(n.actorUserId)) : 'AFRIQORA');
+      return `
+        <article class="af-note-card ${n.read ? '' : 'unread'}" data-note-id="${escapeHtml(n.id)}" data-note-route="${escapeHtml(n.route || '#/notifications')}">
+          <div class="af-note-top">
+            <span class="af-note-type"><span aria-hidden="true">${iconForCategory(n.category)}</span><span>${escapeHtml(n.category || n.type || 'update')}</span></span>
+            <span>${escapeHtml(formatIsoDate(n.createdAt))}</span>
+          </div>
+          <p class="af-note-title">${escapeHtml(n.title || 'AFRIQORA update')}</p>
+          <p class="af-note-message">${escapeHtml(n.message || '')}</p>
+          <div class="af-note-meta">
+            <span>${escapeHtml(actorLabel)}</span>
+            <span>${n.read ? 'Read' : 'Unread'}</span>
+          </div>
+          <div class="af-note-actions">
+            ${n.read ? '' : '<button type="button" data-note-read="' + escapeHtml(n.id) + '">Mark read</button>'}
+            <button type="button" data-note-open="${escapeHtml(n.id)}">Open</button>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="af-view-card">
+        <h3>Notifications</h3>
+        <p class="af-view-hint">Real AFRIQORA events across social, messages, connections, business and system activity.</p>
+        <div class="af-note-toolbar">
+          <span class="af-message-meta">Unread: ${Number(state.unreadCount || 0)}</span>
+          <button type="button" id="af-notes-mark-all">Mark all as read</button>
+        </div>
+        <div class="af-note-list">${itemsHtml || '<div class="af-note-empty">You are all caught up.</div>'}</div>
+        ${state.hasMore ? '<div class="af-note-actions"><button type="button" id="af-notes-more">Load more</button></div>' : ''}
+      </div>
+    `;
+
+    const allBtn = container.querySelector('#af-notes-mark-all');
+    if (allBtn) {
+      allBtn.addEventListener('click', async () => {
+        await apiRequest('/notifications/read-all', { method: 'POST', body: JSON.stringify({}) });
+        state.items = state.items.map((x) => Object.assign({}, x, { read: true }));
+        state.unreadCount = 0;
+        render();
+        refreshNotificationBadges();
+      });
+    }
+
+    container.querySelectorAll('[data-note-read]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-note-read');
+        if (!id) return;
+        const res = await apiRequest('/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST', body: JSON.stringify({}) });
+        if (res.ok) {
+          state.items = state.items.map((x) => (String(x.id) === String(id) ? Object.assign({}, x, { read: true }) : x));
+          state.unreadCount = Math.max(0, Number(state.unreadCount || 0) - 1);
+          render();
+          refreshNotificationBadges();
+        }
+      });
+    });
+
+    container.querySelectorAll('[data-note-open]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-note-open');
+        const note = state.items.find((x) => String(x.id) === String(id));
+        if (!note) return;
+        if (!note.read) {
+          await apiRequest('/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST', body: JSON.stringify({}) });
+        }
+        refreshNotificationBadges();
+        window.location.hash = note.route || '#/notifications';
+      });
+    });
+
+    container.querySelectorAll('[data-note-id][data-note-route]').forEach((card) => {
+      card.addEventListener('click', () => {
+        const route = card.getAttribute('data-note-route') || '#/notifications';
+        window.location.hash = route;
+      });
+    });
+
+    const moreBtn = container.querySelector('#af-notes-more');
+    if (moreBtn) moreBtn.addEventListener('click', () => loadPage(true));
+  }
+
+  async function loadPage(append) {
+    if (state.loading) return;
+    state.loading = true;
+    try {
+      const cursor = append ? state.cursor : 0;
+      const res = await apiRequest('/notifications?limit=16&cursor=' + encodeURIComponent(String(cursor || 0)), { method: 'GET' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok || !Array.isArray(data.items)) {
+        container.innerHTML = '<div class="af-view-card"><h3>Notifications</h3><div class="af-note-error">Could not load notifications.</div></div>';
+        state.loading = false;
+        return;
+      }
+      state.items = append ? state.items.concat(data.items) : data.items.slice();
+      state.cursor = typeof data.nextCursor === 'number' ? data.nextCursor : 0;
+      state.hasMore = !!data.hasMore;
+      state.unreadCount = Number(data.unreadCount || 0);
+      render();
+      refreshNotificationBadges();
+    } catch (e) {
+      container.innerHTML = '<div class="af-view-card"><h3>Notifications</h3><div class="af-note-error">Network issue while loading notifications.</div></div>';
+    }
+    state.loading = false;
+  }
+
+  await loadPage(false);
+}
+
+async function renderNavMessagesView(container) {
+  container.innerHTML = '<div class="af-view-card"><h3>Messages</h3><div class="af-loading" aria-live="polite">Loading conversation...</div></div>';
+  const me = await fetchCurrentUser(false);
+  const thread = await fetchMessageThread();
+  container.innerHTML = `
+    <div class="af-view-card">
+      <h3>Messages</h3>
+      <p class="af-view-hint">Conversation updates sync to your AFRIQORA account where available.</p>
+      <div id="af-messages-thread" class="af-messages-thread"></div>
+      <form id="af-messages-form" class="af-messages-form">
+        <input id="af-messages-input" type="text" placeholder="Write a message" aria-label="Message text" required>
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  `;
+  const threadEl = container.querySelector('#af-messages-thread');
+  const form = container.querySelector('#af-messages-form');
+  const input = container.querySelector('#af-messages-input');
+  let threadState = Array.isArray(thread) ? thread.slice() : [];
+
+  if (me) {
+    try {
+      await apiRequest('/notifications/read-all', { method: 'POST', body: JSON.stringify({ category: 'messages' }) });
+      refreshNotificationBadges();
+    } catch (e) {}
+  }
+
+  function drawThread() {
+    threadEl.innerHTML = threadState.map((m) => `
+      <article class="af-message-bubble ${m.from === 'self' ? 'self' : ''}">
+        <p style="margin:0;">${escapeHtml(m.text || '')}</p>
+        <p class="af-message-meta">${m.from === 'self' ? escapeHtml((me && me.displayName) || 'You') : 'AFRIQORA Support'} · ${escapeHtml(formatIsoDate(m.createdAt))}</p>
+      </article>
+    `).join('');
+    threadEl.scrollTop = threadEl.scrollHeight;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = String(input.value || '').trim();
+    if (!text) return;
+    const sent = await sendMessageThreadMessage(text);
+    if (sent && sent.ok && Array.isArray(sent.thread)) {
+      threadState = sent.thread.slice();
+    }
+    input.value = '';
+    drawThread();
+    if (me) {
+      try {
+        await apiRequest('/notifications/read-all', { method: 'POST', body: JSON.stringify({ category: 'messages' }) });
+      } catch (e) {}
+    }
+    refreshNotificationBadges();
+  });
+
+  drawThread();
+}
+
+async function openProfileEditor() {
+  const me = await fetchCurrentUser(true);
+  if (!me) return;
+  const root = document.createElement('div');
+  root.style.position = 'fixed'; root.style.inset = '0'; root.style.background = 'rgba(0,0,0,0.6)'; root.style.display = 'flex'; root.style.alignItems = 'center'; root.style.justifyContent = 'center'; root.style.zIndex = '999999';
+  const panel = document.createElement('div');
+  panel.style.background = '#0d1a2e'; panel.style.padding = '1rem'; panel.style.borderRadius = '8px'; panel.style.width = 'min(560px,95%)'; panel.style.maxHeight = '90%'; panel.style.overflow = 'auto'; panel.style.color = '#fff';
+  
+  panel.innerHTML = `
+    <h3 style="margin-top:0;">Edit Profile</h3>
+    <div style="display:grid;gap:0.75rem;margin-bottom:1rem;">
+      <div><label>Display Name</label><input type="text" id="prof-name" value="${escapeHtml(me.displayName||'')}"></div>
+      <div><label>Username</label><input type="text" id="prof-username" value="${escapeHtml(me.username||'')}"></div>
+      <div><label>Bio / About Me</label><textarea id="prof-bio" rows="3">${escapeHtml(me.bio||'')}</textarea></div>
+      <div><label>Location</label><input type="text" id="prof-location" value="${escapeHtml(me.location||'')}"></div>
+      <div><label>Website / Link</label><input type="url" id="prof-website" value="${escapeHtml(me.website||'')}"></div>
+      <div><label>Profile Photo</label><input type="file" id="prof-photo" accept="image/*"></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;"><button id="prof-save">Save Profile</button><button id="prof-cancel">Cancel</button></div>
+    <p id="prof-msg" style="color:var(--muted);margin-top:0.5rem;"></p>
+  `;
+  root.appendChild(panel); document.body.appendChild(root);
+
+  panel.querySelector('#prof-cancel').addEventListener('click', () => {
+    try { document.body.removeChild(root); } catch(e){}
+  });
+
+  panel.querySelector('#prof-save').addEventListener('click', async () => {
+    const btn = panel.querySelector('#prof-save');
+    const msg = panel.querySelector('#prof-msg');
+    btn.disabled = true; msg.textContent = 'Saving...';
+    try {
+      const payload = {
+        displayName: panel.querySelector('#prof-name').value.trim(),
+        username: panel.querySelector('#prof-username').value.trim(),
+        bio: panel.querySelector('#prof-bio').value.trim(),
+        location: panel.querySelector('#prof-location').value.trim(),
+        website: panel.querySelector('#prof-website').value.trim()
+      };
+      const fileInput = panel.querySelector('#prof-photo');
+      if (fileInput.files && fileInput.files[0]) {
+        try {
+          const b64 = await readFilesAsDataUrls([fileInput.files[0]]);
+          if (b64 && b64[0]) payload.profilePhoto = b64[0];
+        } catch(e) { msg.textContent = 'Error reading photo'; btn.disabled = false; return; }
+      }
+      const res = await apiRequest('/api/profile/me', { method: 'PUT', body: JSON.stringify(payload) });
+      const data = await res.json().catch(()=>null);
+      if (res.ok && data && data.ok) {
+        authUserCache = data.user;
+        try { document.body.removeChild(root); } catch(e){}
+        const pCont = document.getElementById('view-content');
+        if(pCont && window.currentNavView==='profile') renderNavProfileView(pCont);
+      } else {
+        msg.textContent = data ? data.error || 'Failed to save' : 'Network error';
+        btn.disabled = false;
+      }
+    } catch(e) {
+      msg.textContent = 'Error saving profile';
+      btn.disabled = false;
+    }
+  });
+}
+
+async function renderNavProfileView(container, targetUsername = null) {
+  container.innerHTML = '<div class="af-view-card"><h3>Profile</h3><div class="af-loading" aria-live="polite">Loading profile...</div></div>';
+  
+  if (targetUsername) {
+    const res = await apiRequest(`/api/users/${encodeURIComponent(targetUsername)}`, { method: 'GET' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.user) {
+       container.innerHTML = '<div class="af-view-card"><h3>Profile Not Found</h3><p class="af-view-hint">The user you are looking for does not exist.</p></div>';
+       return;
+    }
+    const profileUser = data.user;
+    const businessName = data.business ? data.business.businessName : null;
+    const hasBusiness = !!businessName;
+    const bPhone = data.business ? data.business.contactPhone : null;
+    const bWhatsApp = data.business ? data.business.contactWhatsApp : null;
+    const bEmail = data.business ? data.business.contactEmail : null;
+    
+    const followers = data.stats ? data.stats.followers : 0;
+    const followingCount = data.stats ? data.stats.following : 0;
+    
+    const postsRes = await apiRequest(`/api/users/${encodeURIComponent(targetUsername)}/posts`, { method: 'GET' });
+    const postsData = postsRes ? await postsRes.json().catch(() => null) : null;
+    const myPosts = (postsData && Array.isArray(postsData.posts)) ? postsData.posts : [];
+    
+    let isFollowing = false;
+    if (authUserCache) {
+      const fRes = await apiRequest(`/follow/status?creatorId=${encodeURIComponent(profileUser.id)}&userId=${encodeURIComponent(authUserCache.id)}`, { method: 'GET' }).catch(() => null);
+      const fData = fRes ? await fRes.json().catch(() => null) : null;
+      isFollowing = fData ? fData.following : false;
+    }
+    
+    const postsHtml = myPosts.length ? myPosts.map(post => `
+      <article class="af-view-item" style="margin-top:1rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:1rem;">
+        <p><strong>${escapeHtml(post.title || 'Post')}</strong></p>
+        <p style="white-space:pre-wrap;">${escapeHtml(post.content || '')}</p>
+        ${post.image ? `<img src="${escapeHtml(post.image)}" style="max-width:100%;border-radius:6px;margin-top:0.5rem;">` : ''}
+        ${post.video ? `<video src="${escapeHtml(post.video)}" controls style="max-width:100%;border-radius:6px;margin-top:0.5rem;"></video>` : ''}
+        <p class="af-message-meta" style="margin-top:0.5rem;">${escapeHtml(formatIsoDate(post.createdAt))}</p>
+      </article>
+    `).join('') : '<p class="af-view-hint" style="margin-top:1rem;">No posts yet.</p>';
+    
+    container.innerHTML = `
+      <div class="af-view-card">
+        <div style="display:flex;align-items:flex-start;gap:1.5rem;margin-bottom:1.5rem;">
+          ${profileUser.profilePhoto ? `<img src="${escapeHtml(profileUser.profilePhoto)}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);">` : `<div style="width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;border:3px solid var(--accent);">No Photo</div>`}
+          <div style="flex:1;">
+             <h2 style="margin:0 0 0.25rem 0;">${escapeHtml(profileUser.displayName || 'Anonymous')}</h2>
+             <p style="margin:0 0 0.75rem 0;color:var(--muted);">@${escapeHtml(profileUser.username || profileUser.id.substring(0,8))}</p>
+             ${profileUser.bio ? `<p style="margin:0 0 0.75rem 0;white-space:pre-wrap;line-height:1.4;">${escapeHtml(profileUser.bio)}</p>` : ''}
+             
+             <div style="display:flex;flex-wrap:wrap;gap:1rem;font-size:0.9rem;color:var(--muted);margin-bottom:1rem;">
+               ${profileUser.location ? `<div>📍 ${escapeHtml(profileUser.location)}</div>` : ''}
+               ${profileUser.website ? `<div>🔗 <a href="${escapeHtml(profileUser.website)}" target="_blank" style="color:var(--accent);text-decoration:none;">Website</a></div>` : ''}
+               ${hasBusiness ? `<div>💼 <span style="color:var(--accent);">Business: ${escapeHtml(businessName)}</span></div>` : ''}
+               ${bPhone ? `<div>📞 ${escapeHtml(bPhone)}</div>` : ''}
+               ${bWhatsApp ? `<div>💬 WhatsApp: ${escapeHtml(bWhatsApp)}</div>` : ''}
+               ${bEmail ? `<div>✉️ ${escapeHtml(bEmail)}</div>` : ''}
+             </div>
+             
+             <div style="display:flex;gap:1.5rem;margin-bottom:1.5rem;font-size:0.95rem;">
+                <div><strong style="color:var(--text);">${followers}</strong> <span style="color:var(--muted);">Followers</span></div>
+                <div><strong style="color:var(--text);">${followingCount}</strong> <span style="color:var(--muted);">Following</span></div>
+             </div>
+             
+             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+               ${authUserCache && authUserCache.id !== profileUser.id ? `<button type="button" class="af-action-follow" data-id="${escapeHtml(profileUser.id)}" data-following="${isFollowing}" style="background:${isFollowing ? 'transparent' : 'var(--accent)'};color:${isFollowing ? 'var(--text)' : '#000'};border:1px solid ${isFollowing ? 'var(--border)' : 'transparent'};padding:0.5rem 1.5rem;border-radius:20px;font-weight:600;cursor:pointer;">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
+             </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="af-view-card" style="margin-top:1rem;">
+        <h3>Timeline</h3>
+        <div id="af-profile-posts">
+          ${postsHtml}
+        </div>
+      </div>
+    `;
+    
+    const fbtn = container.querySelector('.af-action-follow');
+    if (fbtn) {
+       fbtn.addEventListener('click', async (e) => {
+          const btn = e.target;
+          const cid = btn.getAttribute('data-id');
+          const isF = btn.getAttribute('data-following') === 'true';
+          const endpoint = isF ? '/unfollow' : '/follow';
+          btn.disabled = true;
+          const payload = isF ? { creatorId: cid, followerId: authUserCache.id } : { creatorId: cid };
+          const rr = await apiRequest(endpoint, { method: 'POST', body: JSON.stringify(payload) });
+          if (rr.ok) {
+             renderNavProfileView(container, targetUsername);
+          } else {
+             btn.disabled = false;
+          }
+       });
+    }
+    return;
+  }
+
+  const me = await fetchCurrentUser(true);
+  if (!me) {
+    container.innerHTML = `
+      <div class="af-view-card">
+        <h3>Profile</h3>
+        <p class="af-view-hint">Sign in to view your profile.</p>
+        <div class="af-profile-actions">
+          <button type="button" id="af-open-account-btn">Open Account</button>
+        </div>
+      </div>
+    `;
+    container.querySelector('#af-open-account-btn').addEventListener('click', () => openAccountModal());
+    return;
+  }
+  
+  const dashboard = await apiRequest('/creator/dashboard', { method: 'GET' }).then((r) => r.json()).catch(() => null);
+  const hasBusiness = dashboard && dashboard.profile;
+  const businessName = hasBusiness ? dashboard.profile.businessName : null;
+  const followersCount = dashboard && dashboard.stats ? dashboard.stats.followersCount : 0;
+  // Let's manually fetch our stats via the public route to get accurate following count too
+  let followingCount = 0;
+  if (me.username) {
+     const stRes = await apiRequest(`/api/users/${encodeURIComponent(me.username)}`, { method: 'GET' }).catch(() => null);
+     const stData = stRes ? await stRes.json().catch(() => null) : null;
+     if (stData && stData.stats) followingCount = stData.stats.following;
+  }
+  
+  const postsRes = await apiRequest('/creator/posts/mine', { method: 'GET' }).catch(() => null);
+  const postsData = postsRes ? await postsRes.json().catch(() => null) : null;
+  const myPosts = (postsData && Array.isArray(postsData.posts)) ? postsData.posts : [];
+  
+  const postsHtml = myPosts.length ? myPosts.map(post => `
+    <article class="af-view-item" style="margin-top:1rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:1rem;">
+      <p><strong>${escapeHtml(post.title || 'Post')}</strong></p>
+      <p style="white-space:pre-wrap;">${escapeHtml(post.content || '')}</p>
+      ${post.image ? `<img src="${escapeHtml(post.image)}" style="max-width:100%;border-radius:6px;margin-top:0.5rem;">` : ''}
+      ${post.video ? `<video src="${escapeHtml(post.video)}" controls style="max-width:100%;border-radius:6px;margin-top:0.5rem;"></video>` : ''}
+      <p class="af-message-meta" style="margin-top:0.5rem;">${escapeHtml(formatIsoDate(post.createdAt))}</p>
+    </article>
+  `).join('') : '<p class="af-view-hint" style="margin-top:1rem;">No posts yet.</p>';
+  
+  container.innerHTML = `
+    <div class="af-view-card">
+      <div style="display:flex;align-items:flex-start;gap:1.5rem;margin-bottom:1.5rem;">
+        ${me.profilePhoto ? `<img src="${escapeHtml(me.profilePhoto)}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);">` : `<div style="width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;border:3px solid var(--accent);">No Photo</div>`}
+        <div style="flex:1;">
+           <h2 style="margin:0 0 0.25rem 0;">${escapeHtml(me.displayName || 'Anonymous')}</h2>
+           <p style="margin:0 0 0.75rem 0;color:var(--muted);">@${escapeHtml(me.username || me.id.substring(0,8))}</p>
+           ${me.bio ? `<p style="margin:0 0 0.75rem 0;white-space:pre-wrap;line-height:1.4;">${escapeHtml(me.bio)}</p>` : ''}
+           
+           <div style="display:flex;flex-wrap:wrap;gap:1rem;font-size:0.9rem;color:var(--muted);margin-bottom:1rem;">
+             ${me.location ? `<div>📍 ${escapeHtml(me.location)}</div>` : ''}
+             ${me.website ? `<div>🔗 <a href="${escapeHtml(me.website)}" target="_blank" style="color:var(--accent);text-decoration:none;">Website</a></div>` : ''}
+             ${hasBusiness ? `<div>💼 <span style="color:var(--accent);">Business: ${escapeHtml(businessName)}</span></div>` : ''}
+           </div>
+           
+           <div style="display:flex;gap:1.5rem;margin-bottom:1.5rem;font-size:0.95rem;">
+              <div><strong style="color:var(--text);">${followersCount}</strong> <span style="color:var(--muted);">Followers</span></div>
+              <div><strong style="color:var(--text);">${followingCount}</strong> <span style="color:var(--muted);">Following</span></div>
+           </div>
+           
+           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+             <button type="button" id="af-profile-edit" style="background:var(--accent);color:#000;border:none;padding:0.5rem 1rem;border-radius:20px;font-weight:600;cursor:pointer;">Edit Profile</button>
+             <button type="button" id="af-profile-dashboard" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:0.5rem 1rem;border-radius:20px;cursor:pointer;">Business Dashboard</button>
+             <button type="button" id="af-profile-account" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:0.5rem 1rem;border-radius:20px;cursor:pointer;">Account Settings</button>
+           </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="af-view-card" style="margin-top:1rem;">
+      <h3>Timeline</h3>
+      <div id="af-profile-posts">
+        ${postsHtml}
+      </div>
+    </div>
+  `;
+  container.querySelector('#af-profile-edit').addEventListener('click', () => openProfileEditor());
+  container.querySelector('#af-profile-account').addEventListener('click', () => openAccountModal());
+  container.querySelector('#af-profile-dashboard').addEventListener('click', () => openCreatorDashboard());
+}
+
+function renderNavSettingsView(container) {
+  container.innerHTML = `
+    <div class="af-view-card">
+      <h3>Settings</h3>
+      <p class="af-view-hint">Open AFRIQORA Settings to manage account-level preferences with backend persistence.</p>
+      <div class="af-profile-actions">
+        <button type="button" id="af-open-settings-view-btn">Open Settings</button>
+      </div>
+    </div>
+  `;
+  container.querySelector('#af-open-settings-view-btn').addEventListener('click', () => openSettingsScreen());
+  openSettingsScreen();
+}
+
+function buildPrimaryNavShell() {
+  if (document.getElementById('afriqora-primary-shell')) return null;
+  const scriptEl = document.currentScript;
+  if (!scriptEl || !scriptEl.parentNode) return null;
+
+  const homeView = document.createElement('div');
+  homeView.id = 'af-nav-home-view';
+  homeView.className = 'af-nav-route';
+
+  let cursor = document.body.firstChild;
+  const toMove = [];
+  while (cursor && cursor !== scriptEl) {
+    const next = cursor.nextSibling;
+    if (cursor.nodeType === 1 || (cursor.nodeType === 3 && String(cursor.textContent || '').trim())) {
+      toMove.push(cursor);
+    }
+    cursor = next;
+  }
+  toMove.forEach((n) => homeView.appendChild(n));
+
+  const shell = document.createElement('div');
+  shell.id = 'afriqora-primary-shell';
+  shell.className = 'af-nav-shell';
+  shell.innerHTML = `
+    <aside class="af-nav-sidebar">
+      <div class="af-nav-brand"><span class="af-nav-brand-mark">A</span><span>AFRIQORA</span></div>
+      <p class="af-nav-signature">Flowline Navigation</p>
+      <nav class="af-nav-menu" aria-label="Primary navigation"></nav>
+    </aside>
+    <main class="af-nav-content">
+      <header class="af-nav-top">
+        <div>
+          <h2 class="af-nav-title">AFRIQORA</h2>
+          <p class="af-nav-subtitle" id="af-nav-route-subtitle">Home</p>
+        </div>
+      </header>
+      <section id="af-nav-stage"></section>
+    </main>
+    <nav class="af-nav-mobile" aria-label="Mobile navigation"></nav>
+  `;
+  document.body.insertBefore(shell, scriptEl);
+
+  const stage = shell.querySelector('#af-nav-stage');
+  stage.appendChild(homeView);
+
+  ['search', 'activity', 'notifications', 'messages', 'profile', 'settings'].forEach((id) => {
+    const view = document.createElement('div');
+    view.id = 'af-nav-' + id + '-view';
+    view.className = 'af-nav-route';
+    stage.appendChild(view);
+  });
+
+  return shell;
+}
+
+function initializePrimaryNavigation() {
+  ensurePrimaryNavStyles();
+  const shell = buildPrimaryNavShell();
+  if (!shell) return;
+
+  const navMenu = shell.querySelector('.af-nav-menu');
+  const mobileNav = shell.querySelector('.af-nav-mobile');
+  const subtitle = shell.querySelector('#af-nav-route-subtitle');
+  const stage = shell.querySelector('#af-nav-stage');
+
+  function navButtonHtml(route, mobile) {
+    const withBadge = route.id === 'notifications' || route.id === 'messages';
+    const labelHtml = `<span class="af-nav-label-wrap"><span>${escapeHtml(route.label)}</span>${withBadge ? '<span class="af-nav-badge" hidden></span>' : ''}</span>`;
+    if (mobile) {
+      return `<button type="button" class="af-nav-mobile-btn" data-nav-route="${route.id}"><span aria-hidden="true">${primaryNavIcon(route.icon)}</span>${labelHtml}</button>`;
+    }
+    return `<button type="button" class="af-nav-btn" data-nav-route="${route.id}"><span class="af-nav-icon" aria-hidden="true">${primaryNavIcon(route.icon)}</span>${labelHtml}</button>`;
+  }
+
+  navMenu.innerHTML = AFRIQORA_NAV_ROUTES.map((r) => navButtonHtml(r, false)).join('');
+  mobileNav.innerHTML = AFRIQORA_NAV_ROUTES.map((r) => navButtonHtml(r, true)).join('');
+
+  function setActiveButtons(routeId) {
+    shell.querySelectorAll('[data-nav-route]').forEach((btn) => {
+      const active = btn.getAttribute('data-nav-route') === routeId;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-current', active ? 'page' : 'false');
+    });
+  }
+
+  function showRoute(routeId) {
+    const current = AFRIQORA_NAV_ROUTES.find((r) => r.id === routeId) || AFRIQORA_NAV_ROUTES[0];
+    subtitle.textContent = getPrimaryRouteSubtitle(current.id);
+    setActiveButtons(current.id);
+    stage.querySelectorAll('.af-nav-route').forEach((el) => {
+      el.classList.toggle('active', el.id === 'af-nav-' + current.id + '-view' || (current.id === 'home' && el.id === 'af-nav-home-view'));
+    });
+
+    if (current.id === 'home') renderNavHomeView(document.getElementById('af-nav-home-view'));
+    if (current.id === 'search') renderNavSearchView(document.getElementById('af-nav-search-view'));
+    if (current.id === 'activity') renderNavActivityView(document.getElementById('af-nav-activity-view'));
+    if (current.id === 'notifications') renderNavNotificationsView(document.getElementById('af-nav-notifications-view'));
+    if (current.id === 'messages') renderNavMessagesView(document.getElementById('af-nav-messages-view'));
+    if (current.id === 'profile') renderNavProfileView(document.getElementById('af-nav-profile-view'));
+    if (current.id === 'settings') renderNavSettingsView(document.getElementById('af-nav-settings-view'));
+  }
+
+  function navigate(routeId, replaceState = false) {
+    const target = AFRIQORA_NAV_ROUTES.some((r) => r.id === routeId) ? routeId : 'home';
+    const nextHash = '#/' + target;
+    if (replaceState) {
+      if (window.location.hash !== nextHash) window.history.replaceState(null, '', nextHash);
+      showRoute(target);
+      return;
+    }
+    if (window.location.hash === nextHash) {
+      showRoute(target);
+      return;
+    }
+    window.location.hash = nextHash;
+  }
+
+  shell.querySelectorAll('[data-nav-route]').forEach((btn) => {
+    btn.addEventListener('click', () => navigate(btn.getAttribute('data-nav-route') || 'home'));
+  });
+
+  window.addEventListener('hashchange', () => showRoute(getNavRouteFromHash()));
+  navigate(getNavRouteFromHash(), true);
+  refreshNotificationBadges();
+  if (afNavNotificationPollTimer) clearInterval(afNavNotificationPollTimer);
+  afNavNotificationPollTimer = setInterval(() => {
+    refreshNotificationBadges();
+  }, 12000);
+}
+
+initializePrimaryNavigation();
+applyLanguageChange();

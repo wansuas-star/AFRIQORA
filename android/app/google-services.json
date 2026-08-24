@@ -1,0 +1,30 @@
+{
+  "_comment": "PLACEHOLDER — Replace this file with the real google-services.json from your Firebase Console project.",
+  "_comment2": "Steps: 1) Go to console.firebase.google.com, 2) Create/open your project, 3) Add Android app with package name 'com.afriqora.app', 4) Download google-services.json and replace this file.",
+  "project_info": {
+    "project_number": "REPLACE_WITH_FIREBASE_PROJECT_NUMBER",
+    "project_id": "afriqora-app",
+    "storage_bucket": "afriqora-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "REPLACE_WITH_FIREBASE_APP_ID",
+        "android_client_info": {
+          "package_name": "com.afriqora.app"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_FIREBASE_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

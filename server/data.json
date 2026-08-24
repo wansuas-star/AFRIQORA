@@ -2252,6 +2252,246 @@
       "passwordHash": "$2a$10$p5H/IInwPsdyX7zXLo5foO3LoHaq4adbRUjxQ7ABahWaqwen4Av8m",
       "displayName": "Test User",
       "createdAt": "2026-08-23T20:04:29.844Z"
+    },
+    "u-1787539339847-jt8p": {
+      "afriqoraId": "AQ-3371CCA78A",
+      "id": "u-1787539339847-jt8p",
+      "email": "test+1787539339140@example.com",
+      "passwordHash": "$2a$10$izhv/UsQzTiG5f0aGxpS5eeBlNkB./sARJjgcOHg1zVLG72KKOJee",
+      "displayName": "Test User",
+      "createdAt": "2026-08-24T02:42:19.957Z"
+    },
+    "u-1787539511863-kims": {
+      "afriqoraId": "AQ-AFFF6EAD0D",
+      "id": "u-1787539511863-kims",
+      "email": "smart-author+1787539511708-ezm3@example.com",
+      "passwordHash": "$2a$10$GA8pCXe61ns0LS8xXmkN6.P2gSkngNxZi2JQfExkK.Li0KwP3cZFm",
+      "displayName": "smart-author",
+      "createdAt": "2026-08-24T02:45:11.974Z"
+    },
+    "u-1787539512385-1bq5": {
+      "afriqoraId": "AQ-2620EE4126",
+      "id": "u-1787539512385-1bq5",
+      "email": "smart-viewer-a+1787539512278-95ms@example.com",
+      "passwordHash": "$2a$10$QZA0Z/tRJmWzgvtGQ5GO2ObvMvarhIoD37X2fHv3xM9Ru3tIluZoG",
+      "displayName": "smart-viewer-a",
+      "createdAt": "2026-08-24T02:45:12.484Z"
+    },
+    "u-1787539513031-r3ui": {
+      "afriqoraId": "AQ-378D1E1FCB",
+      "id": "u-1787539513031-r3ui",
+      "email": "smart-viewer-b+1787539512892-d7tq@example.com",
+      "passwordHash": "$2a$10$b4fu87bEsp3F7Ze35nfYnek2aC8bsg2pNNW9jVFqIgpTEnAKyhHTO",
+      "displayName": "smart-viewer-b",
+      "createdAt": "2026-08-24T02:45:13.132Z"
+    },
+    "u-1787539513622-txfb": {
+      "afriqoraId": "AQ-E9B75C8A16",
+      "id": "u-1787539513622-txfb",
+      "email": "smart-viewer-c+1787539513518-61go@example.com",
+      "passwordHash": "$2a$10$p7U32KZnuLUht/y/9ESSnuOe9kyCDpXoFm8R7UKkIGDXQYHYfauIS",
+      "displayName": "smart-viewer-c",
+      "createdAt": "2026-08-24T02:45:13.724Z"
+    },
+    "u-1787539514110-mde5": {
+      "afriqoraId": "AQ-8DCFA032B5",
+      "id": "u-1787539514110-mde5",
+      "email": "smart-viewer-extra-0+1787539513999-k7xf@example.com",
+      "passwordHash": "$2a$10$5vVlDH.ZfQb9Qpk7hcv7u.y.yCgkdKPG6X7DfuIsuCR4Ab2fjrVJK",
+      "displayName": "smart-viewer-extra-0",
+      "createdAt": "2026-08-24T02:45:14.207Z"
+    },
+    "u-1787539514745-l72i": {
+      "afriqoraId": "AQ-0F942FDE5C",
+      "id": "u-1787539514745-l72i",
+      "email": "smart-viewer-extra-1+1787539514591-cm88@example.com",
+      "passwordHash": "$2a$10$XlIMVLm/1laiyQJM1SMFse76UQSiFRqWvmsY.zCMr1vl156z6yWLa",
+      "displayName": "smart-viewer-extra-1",
+      "createdAt": "2026-08-24T02:45:14.851Z"
+    },
+    "u-1787539515281-y2qn": {
+      "afriqoraId": "AQ-C32C4F3E9D",
+      "id": "u-1787539515281-y2qn",
+      "email": "smart-viewer-extra-2+1787539515164-uhex@example.com",
+      "passwordHash": "$2a$10$lqVxYn30JdERuR1pSUIdGOXq8kkaffMwI7Z5jQkFyyWFbMzbsIKkm",
+      "displayName": "smart-viewer-extra-2",
+      "createdAt": "2026-08-24T02:45:15.388Z"
+    },
+    "u-1787539515815-dwq3": {
+      "afriqoraId": "AQ-EB8ECCD4BF",
+      "id": "u-1787539515815-dwq3",
+      "email": "smart-viewer-extra-3+1787539515702-4mie@example.com",
+      "passwordHash": "$2a$10$t4dE3udarNoiv8BB34esfu3iBTEyOQAC.9ox3DKxMqnR4de45VCEO",
+      "displayName": "smart-viewer-extra-3",
+      "createdAt": "2026-08-24T02:45:15.917Z"
+    },
+    "u-1787539890497-b8hc": {
+      "afriqoraId": "AQ-A250DFE1C9",
+      "id": "u-1787539890497-b8hc",
+      "email": "test+1787539890317@example.com",
+      "passwordHash": "$2a$10$cdvLEWl40pbNhuzmSOBCLOTAeetDEogFnPrXUcz1psxIQxT6MbTRW",
+      "displayName": "Test User",
+      "createdAt": "2026-08-24T02:51:30.626Z"
+    },
+    "u-1787539893780-0oe8": {
+      "afriqoraId": "AQ-CE59437BFC",
+      "id": "u-1787539893780-0oe8",
+      "email": "creatorA+1787539893568@example.com",
+      "passwordHash": "$2a$10$6uLyAD.sq/S/anrIcDyvj.qbWMBhozlTXEp96LlpYXAPGjpaO.8/.",
+      "displayName": "Creator A",
+      "createdAt": "2026-08-24T02:51:33.912Z"
+    },
+    "u-1787539896180-1qen": {
+      "afriqoraId": "AQ-442B4A9560",
+      "id": "u-1787539896180-1qen",
+      "email": "creatorB+1787539893568@example.com",
+      "passwordHash": "$2a$10$ihWN8f3pL6IxJmDVe8Duw.dqVBJwta5CG4lIzy1bAOmJ.CrM1Zw1C",
+      "displayName": "Creator B",
+      "createdAt": "2026-08-24T02:51:36.282Z"
+    },
+    "u-1787539983133-nxi5": {
+      "afriqoraId": "AQ-2A004C46F1",
+      "id": "u-1787539983133-nxi5",
+      "email": "creatorA+1787539982974@example.com",
+      "passwordHash": "$2a$10$o3Hz894J8QZxZHb08dOhOed0oHtBIa6hTFbsf3E2smPlytQl0.R5S",
+      "displayName": "Creator A",
+      "createdAt": "2026-08-24T02:53:03.258Z"
+    },
+    "u-1787539985266-pta1": {
+      "afriqoraId": "AQ-7465951B47",
+      "id": "u-1787539985266-pta1",
+      "email": "creatorB+1787539982974@example.com",
+      "passwordHash": "$2a$10$V4/kJWZKj10TDgOrWGGv7OdlKFQA4aNG0dQGeT4ubcNL48N43JtO6",
+      "displayName": "Creator B",
+      "createdAt": "2026-08-24T02:53:05.367Z"
+    },
+    "u-1787540009417-5e5r": {
+      "afriqoraId": "AQ-E2AD6E0656",
+      "id": "u-1787540009417-5e5r",
+      "email": "home-creator+1787540009258-rrx5@example.com",
+      "passwordHash": "$2a$10$o1liHsr6hsOidvFTgVvNderZ4t9zXHDqbSyZjEGGyggPsx3z0h0WS",
+      "displayName": "home-creator",
+      "createdAt": "2026-08-24T02:53:29.543Z"
+    },
+    "u-1787540010043-xhou": {
+      "afriqoraId": "AQ-C0EAA5B644",
+      "id": "u-1787540010043-xhou",
+      "email": "home-viewer+1787540009905-p6dk@example.com",
+      "passwordHash": "$2a$10$XJvjYhYqBWqgFfTSeNKYy.wYs1m0MxLwlTzbRAbxxoYe58NQ2qfeS",
+      "displayName": "home-viewer",
+      "createdAt": "2026-08-24T02:53:30.172Z"
+    },
+    "u-1787540046892-wbb1": {
+      "afriqoraId": "AQ-8E52FD1D0B",
+      "id": "u-1787540046892-wbb1",
+      "email": "search-creator+1787540046743-dcdo@example.com",
+      "passwordHash": "$2a$10$vbgyvl5N.pUuExdAiQmQCOQM384pnSIDpT6uuVuwdjq5ieoZ.Mgcm",
+      "displayName": "search-creator",
+      "createdAt": "2026-08-24T02:54:07.022Z"
+    },
+    "u-1787540047475-nhs4": {
+      "afriqoraId": "AQ-88CF75E095",
+      "id": "u-1787540047475-nhs4",
+      "email": "search-viewer+1787540047355-plm6@example.com",
+      "passwordHash": "$2a$10$EdXMrYCURHU08XTOuLsyIe9v7jgO4R17igHke3TpmGoCohPiBbvsS",
+      "displayName": "search-viewer",
+      "createdAt": "2026-08-24T02:54:07.605Z"
+    },
+    "u-1787540048047-8am6": {
+      "afriqoraId": "AQ-B8DC1482F2",
+      "id": "u-1787540048047-8am6",
+      "email": "search-hidden+1787540047934-831q@example.com",
+      "passwordHash": "$2a$10$nr5j/WR2JnujAbP.Zc.K4uk/9KIP1.zzhVSKms5tpAittypSH9Y6e",
+      "displayName": "search-hidden",
+      "createdAt": "2026-08-24T02:54:08.148Z"
+    },
+    "u-1787540780829-69tk": {
+      "afriqoraId": "AQ-C47685D187",
+      "id": "u-1787540780829-69tk",
+      "email": "smart-author+1787540780573-yzkw@example.com",
+      "passwordHash": "$2a$10$Dk8W1BrYXi8juzyGuvRkhu6ElAKO/.B8Y4JAOl3fEBDgivA2DILai",
+      "displayName": "smart-author",
+      "createdAt": "2026-08-24T03:06:20.955Z"
+    },
+    "u-1787540781484-qphg": {
+      "afriqoraId": "AQ-1DFD668EA4",
+      "id": "u-1787540781484-qphg",
+      "email": "smart-viewer-a+1787540781321-icev@example.com",
+      "passwordHash": "$2a$10$Smm8e5BWVYbYhLVujlBBJ.NSZL7djEDJXlQ/jZKQciWhIFh8DKVwC",
+      "displayName": "smart-viewer-a",
+      "createdAt": "2026-08-24T03:06:21.638Z"
+    },
+    "u-1787540782283-9sao": {
+      "afriqoraId": "AQ-C6765108F4",
+      "id": "u-1787540782283-9sao",
+      "email": "smart-viewer-b+1787540782110-ba0v@example.com",
+      "passwordHash": "$2a$10$5JRIssQX/EthED2f657mPOSY/e5v8X8mZX2UTBhjrULGWSi291E8O",
+      "displayName": "smart-viewer-b",
+      "createdAt": "2026-08-24T03:06:22.441Z"
+    },
+    "u-1787540783111-fazs": {
+      "afriqoraId": "AQ-392AA907D9",
+      "id": "u-1787540783111-fazs",
+      "email": "smart-viewer-c+1787540782941-1mp5@example.com",
+      "passwordHash": "$2a$10$G72U3ru92SCho0Zc2jApsOFS0M3qyrXXG.fC5sWW6T6ArvYMvnIpa",
+      "displayName": "smart-viewer-c",
+      "createdAt": "2026-08-24T03:06:23.304Z"
+    },
+    "u-1787540783794-t5q9": {
+      "afriqoraId": "AQ-F389986ACB",
+      "id": "u-1787540783794-t5q9",
+      "email": "smart-viewer-extra-0+1787540783647-b0ij@example.com",
+      "passwordHash": "$2a$10$i1kZLPENPogdFuctfVQpv.2E5GF.HTueJfZUhDfJKu7/iozV.B.rS",
+      "displayName": "smart-viewer-extra-0",
+      "createdAt": "2026-08-24T03:06:23.909Z"
+    },
+    "u-1787540784361-0tvi": {
+      "afriqoraId": "AQ-EC2A25E347",
+      "id": "u-1787540784361-0tvi",
+      "email": "smart-viewer-extra-1+1787540784227-yere@example.com",
+      "passwordHash": "$2a$10$QbyUaCIr3osN29jwBJ3cEuRWikn9m6tSMJIOxo8YBNUpHypiJXNAu",
+      "displayName": "smart-viewer-extra-1",
+      "createdAt": "2026-08-24T03:06:24.473Z"
+    },
+    "u-1787540784910-p7wa": {
+      "afriqoraId": "AQ-8677F59749",
+      "id": "u-1787540784910-p7wa",
+      "email": "smart-viewer-extra-2+1787540784770-2lc2@example.com",
+      "passwordHash": "$2a$10$HBlbGJbIC2PDOoUtxzHscOzk2bjNEf4lsDFkccNVmyxuGZv0pzE.O",
+      "displayName": "smart-viewer-extra-2",
+      "createdAt": "2026-08-24T03:06:25.024Z"
+    },
+    "u-1787540785424-gu8e": {
+      "afriqoraId": "AQ-2726502A85",
+      "id": "u-1787540785424-gu8e",
+      "email": "smart-viewer-extra-3+1787540785295-meek@example.com",
+      "passwordHash": "$2a$10$r28zzG.7VR7db6xTJz88ueDyieMWQtpIpUwibboR7rWQJq87/JmYS",
+      "displayName": "smart-viewer-extra-3",
+      "createdAt": "2026-08-24T03:06:25.538Z"
+    },
+    "u-1787540838670-hy2e": {
+      "afriqoraId": "AQ-B2F1A00C70",
+      "id": "u-1787540838670-hy2e",
+      "email": "test+1787540838511@example.com",
+      "passwordHash": "$2a$10$.NRe2rfFh2EfIe/G8diEeuikPJ4sXP2tgUcWp722Mm4ZIQ1WCoTjC",
+      "displayName": "Test User",
+      "createdAt": "2026-08-24T03:07:18.791Z"
+    },
+    "u-1787540841568-cozs": {
+      "afriqoraId": "AQ-20CB63EEBB",
+      "id": "u-1787540841568-cozs",
+      "email": "creatorA+1787540841384@example.com",
+      "passwordHash": "$2a$10$2g8tVsR/IaNHcvR6TIxezOusYS/fYFPrXnP0BaLNoSbVEqJ243NBK",
+      "displayName": "Creator A",
+      "createdAt": "2026-08-24T03:07:21.689Z"
+    },
+    "u-1787540843914-9881": {
+      "afriqoraId": "AQ-E7E01E1079",
+      "id": "u-1787540843914-9881",
+      "email": "creatorB+1787540841384@example.com",
+      "passwordHash": "$2a$10$V9NXg81zoi03qJ8FiiseUux1mk5b0xO7soORV0/n2gKx954RZ72km",
+      "displayName": "Creator B",
+      "createdAt": "2026-08-24T03:07:24.038Z"
     }
   },
   "sessions": {
@@ -3234,6 +3474,156 @@
       "userId": "u-1787515469723-2xeo",
       "createdAt": 1787515470943,
       "expiresAt": 1788120270943
+    },
+    "6ddb57de24810a809228bc8e2e96de28": {
+      "userId": "u-1787539339847-jt8p",
+      "createdAt": 1787539340923,
+      "expiresAt": 1788144140923
+    },
+    "c4f1726a9c3602354a4ebb749efa82a2": {
+      "userId": "u-1787539511863-kims",
+      "createdAt": 1787539512223,
+      "expiresAt": 1788144312223
+    },
+    "e68bb1853fc2bb52056464f887d683d0": {
+      "userId": "u-1787539512385-1bq5",
+      "createdAt": 1787539512785,
+      "expiresAt": 1788144312785
+    },
+    "15d105bb64701d16a95d372af0130307": {
+      "userId": "u-1787539513031-r3ui",
+      "createdAt": 1787539513464,
+      "expiresAt": 1788144313464
+    },
+    "60552eb2ad171c1ab8620d8a26fe2bcc": {
+      "userId": "u-1787539513622-txfb",
+      "createdAt": 1787539513947,
+      "expiresAt": 1788144313947
+    },
+    "8360deef6e9cda2483e41629cc3ade5e": {
+      "userId": "u-1787539514110-mde5",
+      "createdAt": 1787539514490,
+      "expiresAt": 1788144314490
+    },
+    "0c7eac19b628cfe5c3658435410f12b6": {
+      "userId": "u-1787539514745-l72i",
+      "createdAt": 1787539515115,
+      "expiresAt": 1788144315115
+    },
+    "6d6ea5dfc92b88b422e24db29e162556": {
+      "userId": "u-1787539515281-y2qn",
+      "createdAt": 1787539515653,
+      "expiresAt": 1788144315653
+    },
+    "974e4cd51af8a708f286e8dab0164a6b": {
+      "userId": "u-1787539515815-dwq3",
+      "createdAt": 1787539516142,
+      "expiresAt": 1788144316142
+    },
+    "4db6c3370d7bd64d1da61d60363d7d9d": {
+      "userId": "u-1787539890497-b8hc",
+      "createdAt": 1787539891821,
+      "expiresAt": 1788144691821
+    },
+    "90ec2b7d48ad95ca1bd4cf950ec31911": {
+      "userId": "u-1787539893780-0oe8",
+      "createdAt": 1787539894197,
+      "expiresAt": 1788144694197
+    },
+    "65155bdb3f5c0c2b4ac3e3989c59124c": {
+      "userId": "u-1787539896180-1qen",
+      "createdAt": 1787539896505,
+      "expiresAt": 1788144696505
+    },
+    "13de3b535a77f57437aab3c5b5f10157": {
+      "userId": "u-1787539983133-nxi5",
+      "createdAt": 1787539983525,
+      "expiresAt": 1788144783525
+    },
+    "401ddb10228f53668c88419d3fccac53": {
+      "userId": "u-1787539985266-pta1",
+      "createdAt": 1787539985649,
+      "expiresAt": 1788144785649
+    },
+    "1fc9bcdd77c7cd0b049878f3c5f0fcea": {
+      "userId": "u-1787540009417-5e5r",
+      "createdAt": 1787540009838,
+      "expiresAt": 1788144809838
+    },
+    "a3125fdcbad5cf51f1ec15e40529b5bb": {
+      "userId": "u-1787540010043-xhou",
+      "createdAt": 1787540010393,
+      "expiresAt": 1788144810393
+    },
+    "15ad717b3dc550ce4e25c48efe1b04d4": {
+      "userId": "u-1787540046892-wbb1",
+      "createdAt": 1787540047291,
+      "expiresAt": 1788144847291
+    },
+    "cb653507846035dae5d9a4bbfbb0c13f": {
+      "userId": "u-1787540047475-nhs4",
+      "createdAt": 1787540047879,
+      "expiresAt": 1788144847879
+    },
+    "ea5b05a37eeaa5375bf1e3b4fb9f9bc9": {
+      "userId": "u-1787540048047-8am6",
+      "createdAt": 1787540048525,
+      "expiresAt": 1788144848525
+    },
+    "8d297c48f6cb41244aae49c3b75dd2dd": {
+      "userId": "u-1787540780829-69tk",
+      "createdAt": 1787540781237,
+      "expiresAt": 1788145581237
+    },
+    "2cf68089cd9ba6c05f29d53f2ea17504": {
+      "userId": "u-1787540781484-qphg",
+      "createdAt": 1787540782062,
+      "expiresAt": 1788145582062
+    },
+    "952997935ae66d76f2ce42ad8395e308": {
+      "userId": "u-1787540782283-9sao",
+      "createdAt": 1787540782876,
+      "expiresAt": 1788145582876
+    },
+    "295b493521e5774a62aaca8dfde7f490": {
+      "userId": "u-1787540783111-fazs",
+      "createdAt": 1787540783595,
+      "expiresAt": 1788145583595
+    },
+    "01a735f284ba42a16e517cd5f3d5d373": {
+      "userId": "u-1787540783794-t5q9",
+      "createdAt": 1787540784170,
+      "expiresAt": 1788145584170
+    },
+    "f8bae09f66b2ee842fe8fe01d3b4c925": {
+      "userId": "u-1787540784361-0tvi",
+      "createdAt": 1787540784719,
+      "expiresAt": 1788145584719
+    },
+    "f24e344cd9de567406ffc5efb0196eff": {
+      "userId": "u-1787540784910-p7wa",
+      "createdAt": 1787540785251,
+      "expiresAt": 1788145585251
+    },
+    "7a920c3f748b8a0954af739c9a2af80c": {
+      "userId": "u-1787540785424-gu8e",
+      "createdAt": 1787540786452,
+      "expiresAt": 1788145586452
+    },
+    "8477702aff7d5beaa3562bcae56cb1a8": {
+      "userId": "u-1787540838670-hy2e",
+      "createdAt": 1787540839735,
+      "expiresAt": 1788145639735
+    },
+    "934daafca0bf5c5f002dcad97935ef22": {
+      "userId": "u-1787540841568-cozs",
+      "createdAt": 1787540841998,
+      "expiresAt": 1788145641998
+    },
+    "bf23bee5877fc152a70d87a65c7db28f": {
+      "userId": "u-1787540843914-9881",
+      "createdAt": 1787540844623,
+      "expiresAt": 1788145644623
     }
   },
   "platform": {
@@ -4411,6 +4801,15 @@
       },
       "AQ-4C9C1847A7": {
         "d7486955-8788-49b8-8523-4bfdf6914be1": 1787511748620
+      },
+      "AQ-C47685D187": {
+        "u-1787540781484-qphg": 1787540787133,
+        "u-1787540782283-9sao": 1787540787364,
+        "u-1787540783111-fazs": 1787540787527,
+        "u-1787540783794-t5q9": 1787540787767,
+        "u-1787540784361-0tvi": 1787540787927,
+        "u-1787540784910-p7wa": 1787540788097,
+        "u-1787540785424-gu8e": 1787540788263
       }
     },
     "followingByUser": {
@@ -4831,6 +5230,27 @@
       },
       "d7486955-8788-49b8-8523-4bfdf6914be1": {
         "AQ-4C9C1847A7": 1787511748620
+      },
+      "u-1787540781484-qphg": {
+        "AQ-C47685D187": 1787540787133
+      },
+      "u-1787540782283-9sao": {
+        "AQ-C47685D187": 1787540787364
+      },
+      "u-1787540783111-fazs": {
+        "AQ-C47685D187": 1787540787527
+      },
+      "u-1787540783794-t5q9": {
+        "AQ-C47685D187": 1787540787767
+      },
+      "u-1787540784361-0tvi": {
+        "AQ-C47685D187": 1787540787927
+      },
+      "u-1787540784910-p7wa": {
+        "AQ-C47685D187": 1787540788097
+      },
+      "u-1787540785424-gu8e": {
+        "AQ-C47685D187": 1787540788263
       }
     }
   },
@@ -5212,6 +5632,40 @@
   },
   "creators": {},
   "creatorPosts": [
+    {
+      "id": "cp-1787540788863-utsr",
+      "ownerUserId": "u-1787540780829-69tk",
+      "ownerAfriqoraId": "AQ-C47685D187",
+      "ownerDisplayName": "smart-author",
+      "title": "Smart Reach Video Post",
+      "content": "Video distribution quality test",
+      "category": "Marketing",
+      "location": "Johannesburg",
+      "website": "",
+      "contact": "",
+      "image": null,
+      "video": "data:video/mp4;base64,AAAA",
+      "status": "published",
+      "createdAt": "2026-08-24T03:06:28.863Z",
+      "updatedAt": null
+    },
+    {
+      "id": "cp-1787540788495-5zpl",
+      "ownerUserId": "u-1787540780829-69tk",
+      "ownerAfriqoraId": "AQ-C47685D187",
+      "ownerDisplayName": "smart-author",
+      "title": "Smart Reach Text Post",
+      "content": "AFRIQORA original content distribution test",
+      "category": "Marketing",
+      "location": "Johannesburg",
+      "website": "",
+      "contact": "",
+      "image": null,
+      "video": null,
+      "status": "published",
+      "createdAt": "2026-08-24T03:06:28.495Z",
+      "updatedAt": null
+    },
     {
       "id": "post-1787511751781-or7a",
       "ownerUserId": "78cbcb51-c326-4727-8ff3-c60d81459bb0",
@@ -11959,6 +12413,66 @@
       "_semanticIndex": "creator a business services creator business profile test johannesburg",
       "updatedAt": "2026-08-23T19:03:01.874Z",
       "createdAt": "2026-08-23T19:03:01.874Z"
+    },
+    "u-1787539893780-0oe8": {
+      "id": "bp-1787539894582-4xik",
+      "ownerUserId": "u-1787539893780-0oe8",
+      "ownerAfriqoraId": "AQ-CE59437BFC",
+      "ownerDisplayName": "Creator A",
+      "businessName": "Creator A Business",
+      "category": "Services",
+      "location": "Johannesburg",
+      "website": "https://example.com",
+      "contact": "+27123456789",
+      "description": "Creator business profile test",
+      "logo": null,
+      "updatedAt": "2026-08-24T02:51:34.583Z",
+      "createdAt": "2026-08-24T02:51:34.583Z"
+    },
+    "u-1787539983133-nxi5": {
+      "id": "bp-1787539983952-7k95",
+      "ownerUserId": "u-1787539983133-nxi5",
+      "ownerAfriqoraId": "AQ-2A004C46F1",
+      "ownerDisplayName": "Creator A",
+      "businessName": "Creator A Business",
+      "category": "Services",
+      "location": "Johannesburg",
+      "website": "https://example.com",
+      "contact": "+27123456789",
+      "description": "Creator business profile test",
+      "logo": null,
+      "updatedAt": "2026-08-24T02:53:03.952Z",
+      "createdAt": "2026-08-24T02:53:03.952Z"
+    },
+    "u-1787540780829-69tk": {
+      "id": "bp-1787540786692-3hlr",
+      "ownerUserId": "u-1787540780829-69tk",
+      "ownerAfriqoraId": "AQ-C47685D187",
+      "ownerDisplayName": "Smart Author",
+      "businessName": "Smart Reach Biz",
+      "category": "Marketing",
+      "location": "Johannesburg",
+      "website": "https://example.com",
+      "contact": "+2711000111",
+      "description": "Business profile for recommendation tests",
+      "logo": null,
+      "updatedAt": "2026-08-24T03:06:26.692Z",
+      "createdAt": "2026-08-24T03:06:26.692Z"
+    },
+    "u-1787540841568-cozs": {
+      "id": "bp-1787540842529-3c41",
+      "ownerUserId": "u-1787540841568-cozs",
+      "ownerAfriqoraId": "AQ-20CB63EEBB",
+      "ownerDisplayName": "Creator A",
+      "businessName": "Creator A Business",
+      "category": "Services",
+      "location": "Johannesburg",
+      "website": "https://example.com",
+      "contact": "+27123456789",
+      "description": "Creator business profile test",
+      "logo": null,
+      "updatedAt": "2026-08-24T03:07:22.529Z",
+      "createdAt": "2026-08-24T03:07:22.529Z"
     }
   },
   "userSettings": {

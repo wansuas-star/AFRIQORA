@@ -236,7 +236,7 @@ app.get('/monetization/token', (req, res) => {
 });
 
 // update settings (admin)
-app.post('/monetization/settings', adminGuard, (req, res) => {
+app.post('/monetization/settings', adminGuard, async (req, res) => {
   const body = req.body || {};
   const { creatorPct, platformPct, viewValue, payoutThreshold } = body;
   if (typeof creatorPct !== 'number' || typeof platformPct !== 'number' || (creatorPct + platformPct) !== 100) {
@@ -251,11 +251,20 @@ app.post('/monetization/settings', adminGuard, (req, res) => {
   if (typeof viewValue === 'number') state.settings.viewValue = viewValue;
   if (typeof payoutThreshold !== 'undefined') state.settings.payoutThreshold = payoutThreshold;
   saveState(state);
+
+  try {
+    await prisma.globalSettings.upsert({
+      where: { id: 'default' },
+      update: { creatorPct, platformPct, viewValue },
+      create: { id: 'default', creatorPct, platformPct, viewValue }
+    });
+  } catch (e) { console.error('Prisma write failed', e); }
+
   res.json({ ok: true, settings: state.settings });
 });
 
 // record a view; dedupe per viewer per 24h
-app.post('/monetization/view', (req, res) => {
+app.post('/monetization/view', async (req, res) => {
   const body = req.body || {};
   const { videoId, creatorId, viewerId, token } = body;
   if (!videoId || !creatorId || !viewerId) return res.status(400).json({ error: 'videoId, creatorId, viewerId required' });
@@ -287,6 +296,33 @@ app.post('/monetization/view', (req, res) => {
   state.creators[creatorId].availableBalance = +( (state.creators[creatorId].availableBalance||0) + creatorShare ).toFixed(6);
   state.platform.totalEarnings = +( (state.platform.totalEarnings||0) + platformShare ).toFixed(6);
   saveState(state);
+
+  try {
+    await prisma.wallet.upsert({
+      where: { userId: String(creatorId) },
+      update: {
+        totalViews: state.creators[creatorId].totalViews,
+        earnings: state.creators[creatorId].earnings,
+        availableBalance: state.creators[creatorId].availableBalance
+      },
+      create: {
+        userId: String(creatorId),
+        totalViews: state.creators[creatorId].totalViews,
+        earnings: state.creators[creatorId].earnings,
+        availableBalance: state.creators[creatorId].availableBalance
+      }
+    });
+
+    await prisma.globalSettings.update({
+      where: { id: 'default' },
+      data: { totalEarnings: state.platform.totalEarnings }
+    }).catch(() => {});
+
+    await prisma.videoViewNonce.create({
+      data: { videoId: String(videoId), nonce: String(token.nonce) }
+    }).catch(() => {});
+  } catch(e) { console.error('Prisma view write failed', e); }
+
   res.json({ counted: true, creatorShare, platformShare, settings: state.settings });
 });
 
@@ -910,14 +946,27 @@ app.put('/creator/posts/:id', requireAuth, (req, res) => {
   res.json({ ok: true, post: toPublicPost(state, post) });
 });
 
-app.delete('/creator/posts/:id', requireAuth, (req, res) => {
+app.delete('/creator/posts/:id', requireAuth, async (req, res) => {
   const state = ensureState();
   const idx = (state.creatorPosts || []).findIndex(p => String(p.id) === String(req.params.id));
-  if (idx === -1) return res.status(404).json({ error: 'post not found' });
+  if (idx === -1) {
+    // try delete from prisma directly if not in state
+    try {
+      await prisma.post.delete({ where: { id: String(req.params.id) } });
+      return res.json({ ok: true });
+    } catch (e) {
+      return res.status(404).json({ error: 'post not found' });
+    }
+  }
   const post = state.creatorPosts[idx];
   if (String(post.ownerUserId) !== String(req.userId)) return res.status(403).json({ error: 'forbidden' });
   state.creatorPosts.splice(idx, 1);
   saveState(state);
+  
+  try {
+    await prisma.post.delete({ where: { id: String(req.params.id) } });
+  } catch (e) { console.error('Prisma post delete failed', e); }
+  
   res.json({ ok: true });
 });
 
@@ -1002,31 +1051,68 @@ app.get('/connect/permissions', (req, res) => {
 });
 
 // connect a service for a user (stub: record intent + perms)
-app.post('/connect/connect', (req, res) => {
-  const { service, userId } = req.body || {};
-  if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
-  const state = ensureState();
-  state.connects = state.connects || {};
-  state.connects[userId] = state.connects[userId] || {};
-  state.connects[userId][service] = { connected: true, createdAt: new Date().toISOString(), meta: { permissions: CONNECT_PERMISSIONS[service] || [] } };
-  saveState(state);
-  res.json({ ok:true, service, connected:true, permissions: state.connects[userId][service].meta.permissions });
+app.post('/connect/connect', async (req, res) => {
+  try {
+    const { service, userId } = req.body || {};
+    if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
+    const state = ensureState();
+    state.connects = state.connects || {};
+    state.connects[userId] = state.connects[userId] || {};
+    const perms = CONNECT_PERMISSIONS[service] || [];
+    const createdAt = new Date();
+    state.connects[userId][service] = { connected: true, createdAt: createdAt.toISOString(), meta: { permissions: perms } };
+    saveState(state);
+
+    try {
+      await prisma.serviceConnection.upsert({
+        where: { userId_serviceName: { userId: String(userId), serviceName: String(service) } },
+        update: { permissions: JSON.stringify(perms) },
+        create: {
+          userId: String(userId),
+          serviceName: String(service),
+          permissions: JSON.stringify(perms),
+          createdAt
+        }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for connect:', e);
+    }
+
+    res.json({ ok:true, service, connected:true, permissions: perms });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
+  }
 });
 
 // disconnect a service
-app.post('/connect/disconnect', (req, res) => {
-  const { service, userId } = req.body || {};
-  if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
-  const state = ensureState();
-  if (state.connects && state.connects[userId] && state.connects[userId][service]) {
-    delete state.connects[userId][service];
-    saveState(state);
+app.post('/connect/disconnect', async (req, res) => {
+  try {
+    const { service, userId } = req.body || {};
+    if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
+    const state = ensureState();
+    if (state.connects && state.connects[userId] && state.connects[userId][service]) {
+      delete state.connects[userId][service];
+      saveState(state);
+    }
+
+    try {
+      await prisma.serviceConnection.deleteMany({
+        where: { userId: String(userId), serviceName: String(service) }
+      });
+    } catch (e) {
+      console.error('Prisma write failed for disconnect:', e);
+    }
+
+    res.json({ ok:true, service, connected:false });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal error' });
   }
-  res.json({ ok:true, service, connected:false });
 });
 
 // request withdrawal (simulate)
-app.post('/creator/:id/withdraw', (req, res) => {
+app.post('/creator/:id/withdraw', async (req, res) => {
   const id = req.params.id; const body = req.body||{}; const amount = Number(body.amount||0);
   const state = ensureState(); state.creators = state.creators||{}; if (!state.creators[id]) state.creators[id] = { totalViews:0, earnings:0, availableBalance:0, withdrawals:[] };
   // enforce payout eligibility threshold (from persisted settings when available)
@@ -1039,6 +1125,17 @@ app.post('/creator/:id/withdraw', (req, res) => {
   const w = { id: 'w-'+Date.now(), amount, requestedAt: new Date().toISOString(), status: 'pending' };
   state.creators[id].withdrawals.unshift(w);
   saveState(state);
+
+  try {
+    await prisma.wallet.update({
+      where: { userId: String(id) },
+      data: { availableBalance: state.creators[id].availableBalance }
+    });
+    await prisma.withdrawal.create({
+      data: { userId: String(id), amount: w.amount, status: w.status, createdAt: new Date(w.requestedAt) }
+    });
+  } catch (e) { console.error('Prisma write failed', e); }
+
   res.json({ ok:true, withdrawal: w });
 });
 

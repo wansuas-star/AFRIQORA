@@ -5,7 +5,7 @@ import prisma from '../../config/prisma';
 export const createPost = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { title, content, mediaUrl, contentType } = req.body;
-    
+
     if (!content) {
       return res.status(400).json({ error: 'Content is required' });
     }

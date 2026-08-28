@@ -85,3 +85,59 @@ model Message {
   sender   User @relation("SentMessages", fields: [senderId], references: [id])
   receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
+model VideoViewNonce {
+  id        String   @id @default(uuid())
+  videoId   String
+  nonce     String
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, nonce])
+}
+
+model ServiceConnection {
+  id          String   @id @default(uuid())
+  userId      String
+  serviceName String
+  permissions String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, serviceName])
+}
+
+model BusinessProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  businessName String
+  category     String
+  description  String?
+  website      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  earnings  Float    @default(0)
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  withdrawals Withdrawal[]
+}
+
+model Withdrawal {
+  id        String   @id @default(uuid())
+  walletId  String
+  amount    Float
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+}
+
+model GlobalSettings {
+  id            String   @id @default("singleton")
+  totalEarnings Float    @default(0)
+  updatedAt     DateTime @updatedAt
+}

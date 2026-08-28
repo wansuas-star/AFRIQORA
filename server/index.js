@@ -115,7 +115,7 @@ function parseCookies(req) {
   const header = req.headers && req.headers.cookie;
   const out = {};
   if (!header) return out;
-  header.split(';').forEach(pair => { const idx = pair.indexOf('='); if (idx === -1) return; const k = pair.slice(0, idx).trim(); const v = pair.slice(idx+1).trim(); out[k] = decodeURIComponent(v); });
+  header.split(';').forEach(pair => { const idx = pair.indexOf('='); if (idx === -1) return; const k = pair.slice(0, idx).trim(); const v = pair.slice(idx + 1).trim(); out[k] = decodeURIComponent(v); });
   return out;
 }
 
@@ -145,7 +145,7 @@ function attachSession(req, res, next) {
     const state = ensureState();
     const sess = getSession(state, sid);
     if (sess) req.userId = sess.userId;
-  } catch (e) {}
+  } catch (e) { }
   next();
 }
 const app = express();
@@ -202,8 +202,9 @@ function toPublicPost(state, post) {
   const stats = buildPostStats(state, post);
   return {
     id: post.id,
+    ownerUserId: post.ownerUserId || post.authorId || null,
     title: post.title,
-    content: post.content,
+    content: post.content || post.text || '',
     category: post.category || '',
     location: post.location || '',
     website: post.website || '',
@@ -211,7 +212,7 @@ function toPublicPost(state, post) {
     image: post.image || null,
     video: post.video || null,
     status: post.status || 'published',
-    createdAt: post.createdAt,
+    createdAt: typeof post.createdAt === 'string' ? post.createdAt : (post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString()),
     updatedAt: post.updatedAt || null,
     ownerAfriqoraId: post.ownerAfriqoraId,
     ownerDisplayName: post.ownerDisplayName || '',
@@ -236,7 +237,7 @@ app.get('/monetization/token', (req, res) => {
 });
 
 // update settings (admin)
-app.post('/monetization/settings', adminGuard, async (req, res) => {
+app.post('/monetization/settings', adminGuard, (req, res) => {
   const body = req.body || {};
   const { creatorPct, platformPct, viewValue, payoutThreshold } = body;
   if (typeof creatorPct !== 'number' || typeof platformPct !== 'number' || (creatorPct + platformPct) !== 100) {
@@ -251,20 +252,316 @@ app.post('/monetization/settings', adminGuard, async (req, res) => {
   if (typeof viewValue === 'number') state.settings.viewValue = viewValue;
   if (typeof payoutThreshold !== 'undefined') state.settings.payoutThreshold = payoutThreshold;
   saveState(state);
-
-  try {
-    await prisma.globalSettings.upsert({
-      where: { id: 'default' },
-      update: { creatorPct, platformPct, viewValue },
-      create: { id: 'default', creatorPct, platformPct, viewValue }
-    });
-  } catch (e) { console.error('Prisma write failed', e); }
-
   res.json({ ok: true, settings: state.settings });
 });
 
+// smart reach config (admin)
+app.put('/smart-reach/config', adminGuard, (req, res) => {
+  const body = req.body || {};
+  const state = ensureState();
+  state.smartReachConfig = Object.assign({}, state.smartReachConfig || {}, body);
+  saveState(state);
+  res.json({ ok: true, config: state.smartReachConfig });
+});
+
+// smart reach content metadata lookup
+app.get('/smart-reach/content/:id', async (req, res) => {
+  const { id } = req.params;
+  const state = ensureState();
+
+  let post = (state.creatorPosts || []).find(p => String(p.id) === String(id));
+  if (!post) {
+    try {
+      const dbPost = await prisma.post.findUnique({ where: { id: String(id) } });
+      if (dbPost) {
+        post = {
+          id: dbPost.id,
+          title: dbPost.title,
+          content: dbPost.text,
+          category: dbPost.category,
+          image: dbPost.image,
+          video: dbPost.video,
+          createdAt: dbPost.createdAt ? dbPost.createdAt.toISOString() : new Date().toISOString()
+        };
+      }
+    } catch (e) {}
+  }
+
+  if (!post) {
+    return res.status(404).json({ error: 'content not found' });
+  }
+
+  let contentType = 'text';
+  if (post.video || post.type === 'video' || post.contentType === 'video') {
+    contentType = 'video';
+  } else if (post.image || post.type === 'image' || post.contentType === 'image') {
+    contentType = 'image';
+  }
+
+  const publishedAt = post.publishedAt || (post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString());
+
+  const srData = (state.smartReachData && state.smartReachData[String(id)]) || {
+    stage: 'initial',
+    impressions: 0,
+    score: 0
+  };
+
+  res.json({
+    ok: true,
+    content: {
+      id: post.id,
+      contentType,
+      publishedAt,
+      title: post.title,
+      category: post.category || ''
+    },
+    smartReach: srData
+  });
+});
+
+// home feed endpoint with Smart Reach recommendations, pagination & filtering
+app.get('/feed/home', async (req, res) => {
+  const state = ensureState();
+  const userId = req.userId ? String(req.userId) : null;
+  const limit = Math.max(1, parseInt(req.query.limit || '20', 10));
+  const cursor = parseInt(req.query.cursor || '0', 10);
+
+  let posts = (state.creatorPosts || []).slice();
+
+  try {
+    const dbPosts = await prisma.post.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    if (dbPosts && dbPosts.length > 0) {
+      for (const p of dbPosts) {
+        if (!posts.some(existing => String(existing.id) === String(p.id))) {
+          posts.push({
+            id: p.id,
+            ownerUserId: p.authorId,
+            title: p.title,
+            content: p.text,
+            category: p.category,
+            location: p.location,
+            website: p.website,
+            contact: p.contact,
+            image: p.image,
+            video: p.video,
+            status: p.status,
+            createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString()
+          });
+        }
+      }
+    }
+  } catch (e) {}
+
+  const notInterestedMap = (userId && state.notInterested && state.notInterested[userId]) || {};
+  const blockedUsersMap = (userId && state.blockedUsers && state.blockedUsers[userId]) || {};
+
+  posts = posts.filter(p => {
+    const postId = String(p.id);
+    const authorId = String(p.ownerUserId || p.authorId || '');
+
+    if (notInterestedMap[postId]) return false;
+    if (authorId && blockedUsersMap[authorId]) return false;
+    return true;
+  });
+
+  const items = posts.map(p => {
+    const pub = toPublicPost(state, p);
+    const srData = (state.smartReachData && state.smartReachData[String(p.id)]) || {};
+    pub.recommendationScore = typeof srData.score === 'number' ? srData.score : 0.5;
+    return pub;
+  });
+
+  const startIndex = isNaN(cursor) ? 0 : cursor;
+  const pageItems = items.slice(startIndex, startIndex + limit);
+  const hasMore = startIndex + limit < items.length;
+  const nextCursor = hasMore ? startIndex + limit : null;
+
+  res.json({
+    ok: true,
+    items: pageItems,
+    hasMore,
+    nextCursor
+  });
+});
+
+// smart reach engagement event tracking
+app.post('/smart-reach/engagement', (req, res) => {
+  const body = req.body || {};
+  const { contentId, eventType, watchTimeMs } = body;
+  if (!contentId || !eventType) return res.status(400).json({ error: 'contentId and eventType required' });
+
+  const state = ensureState();
+  state.smartReachData = state.smartReachData || {};
+
+  const id = String(contentId);
+  const data = state.smartReachData[id] || {
+    stage: 'initial',
+    impressions: 0,
+    views: 0,
+    watchTimeMs: 0,
+    completions: 0,
+    profileVisits: 0,
+    saves: 0,
+    score: 0.5
+  };
+
+  if (eventType === 'impression') data.impressions += 1;
+  else if (eventType === 'view') data.views += 1;
+  else if (eventType === 'watch_time') data.watchTimeMs += (Number(watchTimeMs) || 0);
+  else if (eventType === 'completion') data.completions += 1;
+  else if (eventType === 'profile_visit') data.profileVisits += 1;
+  else if (eventType === 'save') data.saves += 1;
+
+  // Calculate recommendation score
+  data.score = 0.05 * data.impressions + 0.1 * data.views + 0.2 * data.completions + 0.15 * data.saves + 0.1 * data.profileVisits + (data.watchTimeMs > 10000 ? 0.2 : 0);
+
+  // Evaluate stage expansion
+  const cfg = state.smartReachConfig || {};
+  const thresholds = cfg.stageThresholds || {};
+  const minImpExp = thresholds.initialToExpandedMinImpressions || 2;
+  const minScoreExp = thresholds.initialToExpandedMinScore || 0.1;
+  const minImpDisc = thresholds.expandedToDiscoveryMinImpressions || 5;
+  const minScoreDisc = thresholds.expandedToDiscoveryMinScore || 0.12;
+
+  if (data.impressions >= minImpDisc && data.score >= minScoreDisc) {
+    data.stage = 'discovery';
+  } else if (data.impressions >= minImpExp && data.score >= minScoreExp) {
+    data.stage = 'expanded';
+  } else {
+    data.stage = 'initial';
+  }
+
+  state.smartReachData[id] = data;
+  saveState(state);
+
+  res.json({ ok: true, smartReach: data });
+});
+
+// content reach analytics
+app.get('/analytics/content/:id', (req, res) => {
+  const { id } = req.params;
+  const state = ensureState();
+  const srData = (state.smartReachData && state.smartReachData[String(id)]) || {};
+
+  res.json({
+    ok: true,
+    contentId: id,
+    reach: {
+      impressions: srData.impressions || 0,
+      views: srData.views || 0,
+      saves: srData.saves || 0,
+      completions: srData.completions || 0,
+      watchTimeMs: srData.watchTimeMs || 0
+    }
+  });
+});
+
+// mark content as not-interested for user
+app.post('/content/not-interested', requireAuth, (req, res) => {
+  const { contentId, reason } = req.body || {};
+  if (!contentId) return res.status(400).json({ error: 'contentId required' });
+
+  const state = ensureState();
+  const userId = String(req.userId);
+  state.notInterested = state.notInterested || {};
+  state.notInterested[userId] = state.notInterested[userId] || {};
+  state.notInterested[userId][String(contentId)] = {
+    reason: reason || '',
+    createdAt: new Date().toISOString()
+  };
+  saveState(state);
+
+  res.json({ ok: true });
+});
+
+// report content
+app.post('/content/report', requireAuth, (req, res) => {
+  const { contentId, reason } = req.body || {};
+  if (!contentId) return res.status(400).json({ error: 'contentId required' });
+
+  const state = ensureState();
+  const userId = String(req.userId);
+  state.reports = state.reports || [];
+  state.reports.push({
+    id: 'rep-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    contentId: String(contentId),
+    reporterUserId: userId,
+    reason: sanitizeText(reason || '', 500),
+    createdAt: new Date().toISOString()
+  });
+  saveState(state);
+
+  res.json({ ok: true });
+});
+
+// block user for current viewer
+app.post('/users/block', requireAuth, (req, res) => {
+  const { targetUserId } = req.body || {};
+  if (!targetUserId) return res.status(400).json({ error: 'targetUserId required' });
+
+  const state = ensureState();
+  const userId = String(req.userId);
+  state.blockedUsers = state.blockedUsers || {};
+  state.blockedUsers[userId] = state.blockedUsers[userId] || {};
+  state.blockedUsers[userId][String(targetUserId)] = {
+    createdAt: new Date().toISOString()
+  };
+  saveState(state);
+
+  res.json({ ok: true });
+});
+
+// user preferences settings
+app.put('/settings/preferences', requireAuth, (req, res) => {
+  const body = req.body || {};
+  const state = ensureState();
+  const userId = String(req.userId);
+  state.userPreferences = state.userPreferences || {};
+  state.userPreferences[userId] = body.settings || {};
+  saveState(state);
+
+  res.json({ ok: true, settings: state.userPreferences[userId] });
+});
+
+app.get('/settings/preferences', requireAuth, (req, res) => {
+  const state = ensureState();
+  const userId = String(req.userId);
+  const settings = (state.userPreferences && state.userPreferences[userId]) || {};
+
+  res.json({ ok: true, settings });
+});
+
+// recommendation admin analytics summary
+app.get('/analytics/recommendation', adminGuard, (req, res) => {
+  const state = ensureState();
+  const srData = state.smartReachData || {};
+  let totalImpressions = 0;
+  let totalViews = 0;
+  const stages = { initial: 0, expanded: 0, discovery: 0 };
+
+  Object.values(srData).forEach(item => {
+    totalImpressions += item.impressions || 0;
+    totalViews += item.views || 0;
+    const st = item.stage || 'initial';
+    if (stages[st] !== undefined) stages[st] += 1;
+  });
+
+  res.json({
+    ok: true,
+    summary: {
+      totalTrackedContent: Object.keys(srData).length,
+      totalImpressions,
+      totalViews,
+      stages
+    }
+  });
+});
+
 // record a view; dedupe per viewer per 24h
-app.post('/monetization/view', async (req, res) => {
+app.post('/monetization/view', (req, res) => {
   const body = req.body || {};
   const { videoId, creatorId, viewerId, token } = body;
   if (!videoId || !creatorId || !viewerId) return res.status(400).json({ error: 'videoId, creatorId, viewerId required' });
@@ -281,48 +578,21 @@ app.post('/monetization/view', async (req, res) => {
   if (state.videos[videoId].usedNonces && state.videos[videoId].usedNonces[token.nonce]) return res.json({ counted: false, reason: 'nonce-used' });
   const last = state.videos[videoId].uniqueViewers[viewerId];
   if (last && (now - last) < windowMs) return res.json({ counted: false, reason: 'recent' });
-  state.videos[videoId].views = (state.videos[videoId].views||0) + 1;
+  state.videos[videoId].views = (state.videos[videoId].views || 0) + 1;
   state.videos[videoId].uniqueViewers[viewerId] = now;
   state.videos[videoId].usedNonces = state.videos[videoId].usedNonces || {};
   state.videos[videoId].usedNonces[token.nonce] = now;
   // payout
   const gross = Number(state.settings.viewValue || 0) || 0;
-  const creatorShare = +(gross * (Number(state.settings.creatorPct||70)/100)).toFixed(6);
-  const platformShare = +(gross * (Number(state.settings.platformPct||30)/100)).toFixed(6);
+  const creatorShare = +(gross * (Number(state.settings.creatorPct || 70) / 100)).toFixed(6);
+  const platformShare = +(gross * (Number(state.settings.platformPct || 30) / 100)).toFixed(6);
   state.creators = state.creators || {};
   if (!state.creators[creatorId]) state.creators[creatorId] = { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
-  state.creators[creatorId].totalViews = (state.creators[creatorId].totalViews||0) + 1;
+  state.creators[creatorId].totalViews = (state.creators[creatorId].totalViews || 0) + 1;
   state.creators[creatorId].earnings = +(state.creators[creatorId].earnings + creatorShare).toFixed(6);
-  state.creators[creatorId].availableBalance = +( (state.creators[creatorId].availableBalance||0) + creatorShare ).toFixed(6);
-  state.platform.totalEarnings = +( (state.platform.totalEarnings||0) + platformShare ).toFixed(6);
+  state.creators[creatorId].availableBalance = +((state.creators[creatorId].availableBalance || 0) + creatorShare).toFixed(6);
+  state.platform.totalEarnings = +((state.platform.totalEarnings || 0) + platformShare).toFixed(6);
   saveState(state);
-
-  try {
-    await prisma.wallet.upsert({
-      where: { userId: String(creatorId) },
-      update: {
-        totalViews: state.creators[creatorId].totalViews,
-        earnings: state.creators[creatorId].earnings,
-        availableBalance: state.creators[creatorId].availableBalance
-      },
-      create: {
-        userId: String(creatorId),
-        totalViews: state.creators[creatorId].totalViews,
-        earnings: state.creators[creatorId].earnings,
-        availableBalance: state.creators[creatorId].availableBalance
-      }
-    });
-
-    await prisma.globalSettings.update({
-      where: { id: 'default' },
-      data: { totalEarnings: state.platform.totalEarnings }
-    }).catch(() => {});
-
-    await prisma.videoViewNonce.create({
-      data: { videoId: String(videoId), nonce: String(token.nonce) }
-    }).catch(() => {});
-  } catch(e) { console.error('Prisma view write failed', e); }
-
   res.json({ counted: true, creatorShare, platformShare, settings: state.settings });
 });
 
@@ -331,7 +601,7 @@ app.get('/creator/:id', (req, res, next) => {
   const id = req.params.id;
   if (id === 'dashboard' || id === 'posts' || id === 'business-profile') return next();
   const state = ensureState();
-  const c = state.creators[id] || { totalViews:0, earnings:0, availableBalance:0, withdrawals:[] };
+  const c = state.creators[id] || { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
   res.json({ creator: c, settings: state.settings, platform: state.platform });
 });
 
@@ -349,7 +619,7 @@ app.post('/interactions/like', async (req, res) => {
     state.likes[videoId][userId] = Date.now();
     // ensure video record
     state.videos = state.videos || {};
-    state.videos[videoId] = state.videos[videoId] || { views:0, uniqueViewers:{}, usedNonces:{} };
+    state.videos[videoId] = state.videos[videoId] || { views: 0, uniqueViewers: {}, usedNonces: {} };
     saveState(state);
 
     try {
@@ -387,9 +657,9 @@ app.post('/interactions/unlike', async (req, res) => {
     } catch (e) {
       console.error('Prisma write failed for postLike delete:', e);
     }
-    
+
     if (removed) {
-      return res.json({ ok: true, liked: false, likesCount: Object.keys(state.likes[videoId]||{}).length });
+      return res.json({ ok: true, liked: false, likesCount: Object.keys(state.likes[videoId] || {}).length });
     }
     return res.json({ ok: true, liked: false, reason: 'not-found' });
   } catch (err) {
@@ -404,7 +674,7 @@ app.post('/comments', async (req, res) => {
     const { videoId, authorId, text } = req.body || {};
     if (!videoId || !authorId || !text) return res.status(400).json({ error: 'videoId, authorId and text required' });
     const state = ensureState();
-    const commentId = 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+    const commentId = 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
     const comment = { id: commentId, videoId: String(videoId), authorId: String(authorId), text: String(text), createdAt: new Date().toISOString() };
     state.comments = state.comments || [];
     state.comments.push(comment);
@@ -418,7 +688,7 @@ app.post('/comments', async (req, res) => {
       console.error('Prisma write failed for comment create:', e);
     }
 
-    return res.json({ ok:true, comment });
+    return res.json({ ok: true, comment });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal error' });
@@ -443,7 +713,7 @@ app.post('/follow', async (req, res) => {
     state.follows = state.follows || { followersByCreator: {}, followingByUser: {} };
     state.follows.followersByCreator[creatorId] = state.follows.followersByCreator[creatorId] || {};
     state.follows.followingByUser[followerId] = state.follows.followingByUser[followerId] || {};
-    if (state.follows.followersByCreator[creatorId][followerId]) return res.json({ ok:true, followed:false, reason:'already' });
+    if (state.follows.followersByCreator[creatorId][followerId]) return res.json({ ok: true, followed: false, reason: 'already' });
     state.follows.followersByCreator[creatorId][followerId] = Date.now();
     state.follows.followingByUser[followerId][creatorId] = Date.now();
     saveState(state);
@@ -456,7 +726,7 @@ app.post('/follow', async (req, res) => {
       console.error('Prisma write failed for follow create:', e);
     }
 
-    return res.json({ ok:true, followed:true, followersCount: Object.keys(state.follows.followersByCreator[creatorId]).length });
+    return res.json({ ok: true, followed: true, followersCount: Object.keys(state.follows.followersByCreator[creatorId]).length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal error' });
@@ -485,7 +755,7 @@ app.post('/unfollow', async (req, res) => {
       console.error('Prisma write failed for follow delete:', e);
     }
 
-    return res.json({ ok:true, followed:false });
+    return res.json({ ok: true, followed: false });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal error' });
@@ -500,7 +770,7 @@ app.post('/interactions/share', async (req, res) => {
     const state = ensureState();
     state.shares = state.shares || {};
     state.shares[videoId] = state.shares[videoId] || [];
-    state.shares[videoId].push({ userId: String(userId), platform: platform||null, createdAt: new Date().toISOString() });
+    state.shares[videoId].push({ userId: String(userId), platform: platform || null, createdAt: new Date().toISOString() });
     saveState(state);
 
     try {
@@ -511,7 +781,7 @@ app.post('/interactions/share', async (req, res) => {
       console.error('Prisma write failed for share create:', e);
     }
 
-    return res.json({ ok:true, sharesCount: state.shares[videoId].length });
+    return res.json({ ok: true, sharesCount: state.shares[videoId].length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal error' });
@@ -528,6 +798,41 @@ app.get('/interactions/likes', (req, res) => {
   res.json({ videoId, likesCount, liked });
 });
 
+// save a video/content
+app.post('/interactions/save', requireAuth, (req, res) => {
+  const { videoId, contentId } = req.body || {};
+  const id = String(videoId || contentId || '');
+  if (!id) return res.status(400).json({ error: 'videoId is required' });
+
+  const state = ensureState();
+  const userId = String(req.userId);
+  state.saves = state.saves || {};
+  state.saves[userId] = state.saves[userId] || {};
+
+  state.saves[userId][id] = true;
+
+  // Also increment saves in smartReachData
+  state.smartReachData = state.smartReachData || {};
+  if (!state.smartReachData[id]) {
+    state.smartReachData[id] = { stage: 'initial', impressions: 0, views: 0, watchTimeMs: 0, completions: 0, profileVisits: 0, saves: 0, score: 0.5 };
+  }
+  state.smartReachData[id].saves = (state.smartReachData[id].saves || 0) + 1;
+
+  saveState(state);
+
+  res.json({ ok: true, saved: true });
+});
+
+// query saves status for a video
+app.get('/interactions/saves', requireAuth, (req, res) => {
+  const videoId = String(req.query.videoId || req.query.contentId || '');
+  const state = ensureState();
+  const userId = String(req.userId);
+  const saved = !!(state.saves && state.saves[userId] && state.saves[userId][videoId]);
+
+  res.json({ ok: true, saved });
+});
+
 // query follow status and follower count
 app.get('/follow/status', (req, res) => {
   const { creatorId, userId } = req.query || {};
@@ -542,11 +847,11 @@ app.get('/follow/status', (req, res) => {
 app.get('/stats/video/:id', (req, res) => {
   const id = req.params.id;
   const state = ensureState();
-  const video = state.videos && state.videos[id] ? state.videos[id] : { views:0 };
+  const video = state.videos && state.videos[id] ? state.videos[id] : { views: 0 };
   const likesCount = state.likes && state.likes[id] ? Object.keys(state.likes[id]).length : 0;
-  const commentsCount = (state.comments || []).filter(c=>String(c.videoId)===String(id)).length;
+  const commentsCount = (state.comments || []).filter(c => String(c.videoId) === String(id)).length;
   const sharesCount = state.shares && state.shares[id] ? state.shares[id].length : 0;
-  res.json({ videoId: id, views: Number(video.views||0), likes: likesCount, comments: commentsCount, shares: sharesCount });
+  res.json({ videoId: id, views: Number(video.views || 0), likes: likesCount, comments: commentsCount, shares: sharesCount });
 });
 
 // Connect module: list services connected for a user
@@ -566,10 +871,10 @@ app.post('/auth/register', async (req, res) => {
     // ensure unique email
     const existing = Object.values(state.users).find(u => String(u.email).toLowerCase() === String(email).toLowerCase());
     if (existing) return res.status(400).json({ error: 'email in use' });
-    const userId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+    const userId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
     const hash = bcrypt.hashSync(String(password), 10);
     const afriqoraId = generateAfriqoraId();
-    
+
     // Write to legacy state
     state.users[userId] = {
       afriqoraId: afriqoraId,
@@ -598,8 +903,8 @@ app.post('/auth/register', async (req, res) => {
 
     // create session
     const sid = createSession(state, userId);
-    res.setHeader('Set-Cookie', `afr_session=${encodeURIComponent(sid)}; HttpOnly; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS/1000)}`);
-    res.json({ ok:true, user: safeUser(state.users[userId]) });
+    res.setHeader('Set-Cookie', `afr_session=${encodeURIComponent(sid)}; HttpOnly; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`);
+    res.json({ ok: true, user: safeUser(state.users[userId]) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -610,28 +915,28 @@ app.post('/auth/login', (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
   const state = ensureState();
-  const user = Object.values(state.users||{}).find(u => String(u.email).toLowerCase() === String(email).toLowerCase());
+  const user = Object.values(state.users || {}).find(u => String(u.email).toLowerCase() === String(email).toLowerCase());
   if (!user) return res.status(400).json({ error: 'invalid credentials' });
   if (!bcrypt.compareSync(String(password), String(user.passwordHash))) return res.status(400).json({ error: 'invalid credentials' });
   if (!user.afriqoraId) user.afriqoraId = generateAfriqoraId();
   const sid = createSession(state, user.id);
   saveState(state);
-  res.setHeader('Set-Cookie', `afr_session=${encodeURIComponent(sid)}; HttpOnly; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS/1000)}`);
-  res.json({ ok:true, user: safeUser(user) });
+  res.setHeader('Set-Cookie', `afr_session=${encodeURIComponent(sid)}; HttpOnly; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`);
+  res.json({ ok: true, user: safeUser(user) });
 });
 
 app.post('/auth/logout', (req, res) => {
   const cookies = parseCookies(req); const sid = cookies['afr_session']; const state = ensureState(); if (sid && state.sessions && state.sessions[sid]) { delete state.sessions[sid]; saveState(state); }
   // expire cookie
   res.setHeader('Set-Cookie', `afr_session=deleted; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
-  res.json({ ok:true });
+  res.json({ ok: true });
 });
 
 app.get('/auth/me', async (req, res) => {
   if (!req.userId) return res.json({ user: null });
-  const state = ensureState(); 
+  const state = ensureState();
   let u = null;
-  
+
   try {
     const prismaUser = await prisma.user.findUnique({ where: { id: String(req.userId) } });
     if (prismaUser) {
@@ -652,7 +957,7 @@ app.get('/auth/me', async (req, res) => {
   } else if (!u.afriqoraId) {
     // Make sure Prisma user has afriqoraId (which is required in DB anyway)
     u.afriqoraId = generateAfriqoraId();
-    await prisma.user.update({ where: { id: u.id }, data: { afriqoraId: u.afriqoraId } }).catch(()=>{});
+    await prisma.user.update({ where: { id: u.id }, data: { afriqoraId: u.afriqoraId } }).catch(() => { });
   }
 
   res.json({ user: safeUser(u) });
@@ -678,10 +983,10 @@ app.get('/creator/dashboard', requireAuth, async (req, res) => {
 
   state.creators = state.creators || {};
   const creatorStats = state.creators[user.afriqoraId] || { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
-  
+
   let myPosts = [];
   let businessProfile = null;
-  
+
   try {
     const pPosts = await prisma.post.findMany({
       where: { authorId: String(req.userId) },
@@ -823,7 +1128,7 @@ app.post('/creator/posts', requireAuth, async (req, res) => {
     const status = sanitizeText(body.status, 40) || 'published';
     const createdAt = new Date();
     const isBusiness = !!(state.businessProfiles && state.businessProfiles[user.id]);
-    
+
     const post = {
       id: postId,
       ownerUserId: user.id,
@@ -949,24 +1254,19 @@ app.put('/creator/posts/:id', requireAuth, (req, res) => {
 app.delete('/creator/posts/:id', requireAuth, async (req, res) => {
   const state = ensureState();
   const idx = (state.creatorPosts || []).findIndex(p => String(p.id) === String(req.params.id));
-  if (idx === -1) {
-    // try delete from prisma directly if not in state
-    try {
-      await prisma.post.delete({ where: { id: String(req.params.id) } });
-      return res.json({ ok: true });
-    } catch (e) {
-      return res.status(404).json({ error: 'post not found' });
-    }
-  }
+  if (idx === -1) return res.status(404).json({ error: 'post not found' });
   const post = state.creatorPosts[idx];
   if (String(post.ownerUserId) !== String(req.userId)) return res.status(403).json({ error: 'forbidden' });
   state.creatorPosts.splice(idx, 1);
   saveState(state);
-  
+
+  // Dual-delete from Prisma to keep stores in sync
   try {
     await prisma.post.delete({ where: { id: String(req.params.id) } });
-  } catch (e) { console.error('Prisma post delete failed', e); }
-  
+  } catch (dbErr) {
+    console.error('Prisma delete failed for creator/posts/:id:', dbErr);
+  }
+
   res.json({ ok: true });
 });
 
@@ -975,7 +1275,7 @@ app.get('/creator/posts/public', async (req, res) => {
   const q = sanitizeText(req.query.q || '', 200).toLowerCase();
   const category = sanitizeText(req.query.category || '', 100).toLowerCase();
   const location = sanitizeText(req.query.location || '', 120).toLowerCase();
-  
+
   let items = [];
   try {
     const whereClause = { status: 'published' };
@@ -986,7 +1286,7 @@ app.get('/creator/posts/public', async (req, res) => {
     if (location) {
       whereClause.location = { contains: location };
     }
-    
+
     // For global search, we fetch and filter in memory as a simple fallback if Prisma FTS isn't set up
     const prismaPosts = await prisma.post.findMany({
       where: whereClause,
@@ -1051,38 +1351,44 @@ app.get('/connect/permissions', (req, res) => {
 });
 
 // connect a service for a user (stub: record intent + perms)
-app.post('/connect/connect', async (req, res) => {
-  try {
-    const { service, userId } = req.body || {};
-    if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
-    const state = ensureState();
-    state.connects = state.connects || {};
-    state.connects[userId] = state.connects[userId] || {};
-    const perms = CONNECT_PERMISSIONS[service] || [];
-    const createdAt = new Date();
-    state.connects[userId][service] = { connected: true, createdAt: createdAt.toISOString(), meta: { permissions: perms } };
+app.post('/connect/connect', (req, res) => {
+  const { service, userId } = req.body || {};
+  if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
+  const state = ensureState();
+  state.connects = state.connects || {};
+  state.connects[userId] = state.connects[userId] || {};
+  state.connects[userId][service] = { connected: true, createdAt: new Date().toISOString(), meta: { permissions: CONNECT_PERMISSIONS[service] || [] } };
+  saveState(state);
+  res.json({ ok: true, service, connected: true, permissions: state.connects[userId][service].meta.permissions });
+});
+
+// disconnect a service
+app.post('/connect/disconnect', (req, res) => {
+  const { service, userId } = req.body || {};
+  if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
+  const state = ensureState();
+  if (state.connects && state.connects[userId] && state.connects[userId][service]) {
+    delete state.connects[userId][service];
     saveState(state);
-
-    try {
-      await prisma.serviceConnection.upsert({
-        where: { userId_serviceName: { userId: String(userId), serviceName: String(service) } },
-        update: { permissions: JSON.stringify(perms) },
-        create: {
-          userId: String(userId),
-          serviceName: String(service),
-          permissions: JSON.stringify(perms),
-          createdAt
-        }
-      });
-    } catch (e) {
-      console.error('Prisma write failed for connect:', e);
-    }
-
-    res.json({ ok:true, service, connected:true, permissions: perms });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal error' });
   }
+  res.json({ ok: true, service, connected: false });
+});
+
+// request withdrawal (simulate)
+app.post('/creator/:id/withdraw', (req, res) => {
+  const id = req.params.id; const body = req.body || {}; const amount = Number(body.amount || 0);
+  const state = ensureState(); state.creators = state.creators || {}; if (!state.creators[id]) state.creators[id] = { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
+  // enforce payout eligibility threshold (from persisted settings when available)
+  const creatorViews = Number(state.creators[id].totalViews || 0);
+  const threshold = Number((state.settings && state.settings.payoutThreshold) || PAYOUT_VIEWS_THRESHOLD);
+  if (creatorViews < threshold) return res.status(400).json({ error: `Withdrawal eligibility requires ${threshold} valid views. You have ${creatorViews}.` });
+  const avail = Number(state.creators[id].availableBalance || 0);
+  if (amount <= 0 || amount > avail) return res.status(400).json({ error: 'invalid amount' });
+  state.creators[id].availableBalance = +(avail - amount).toFixed(6);
+  const w = { id: 'w-' + Date.now(), amount, requestedAt: new Date().toISOString(), status: 'pending' };
+  state.creators[id].withdrawals.unshift(w);
+  saveState(state);
+  res.json({ ok: true, withdrawal: w });
 });
 
 // disconnect a service
@@ -1104,7 +1410,7 @@ app.post('/connect/disconnect', async (req, res) => {
       console.error('Prisma write failed for disconnect:', e);
     }
 
-    res.json({ ok:true, service, connected:false });
+    res.json({ ok: true, service, connected: false });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal error' });
@@ -1113,16 +1419,16 @@ app.post('/connect/disconnect', async (req, res) => {
 
 // request withdrawal (simulate)
 app.post('/creator/:id/withdraw', async (req, res) => {
-  const id = req.params.id; const body = req.body||{}; const amount = Number(body.amount||0);
-  const state = ensureState(); state.creators = state.creators||{}; if (!state.creators[id]) state.creators[id] = { totalViews:0, earnings:0, availableBalance:0, withdrawals:[] };
+  const id = req.params.id; const body = req.body || {}; const amount = Number(body.amount || 0);
+  const state = ensureState(); state.creators = state.creators || {}; if (!state.creators[id]) state.creators[id] = { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
   // enforce payout eligibility threshold (from persisted settings when available)
-  const creatorViews = Number(state.creators[id].totalViews||0);
+  const creatorViews = Number(state.creators[id].totalViews || 0);
   const threshold = Number((state.settings && state.settings.payoutThreshold) || PAYOUT_VIEWS_THRESHOLD);
   if (creatorViews < threshold) return res.status(400).json({ error: `Withdrawal eligibility requires ${threshold} valid views. You have ${creatorViews}.` });
-  const avail = Number(state.creators[id].availableBalance||0);
+  const avail = Number(state.creators[id].availableBalance || 0);
   if (amount <= 0 || amount > avail) return res.status(400).json({ error: 'invalid amount' });
   state.creators[id].availableBalance = +(avail - amount).toFixed(6);
-  const w = { id: 'w-'+Date.now(), amount, requestedAt: new Date().toISOString(), status: 'pending' };
+  const w = { id: 'w-' + Date.now(), amount, requestedAt: new Date().toISOString(), status: 'pending' };
   state.creators[id].withdrawals.unshift(w);
   saveState(state);
 
@@ -1136,8 +1442,8 @@ app.post('/creator/:id/withdraw', async (req, res) => {
     });
   } catch (e) { console.error('Prisma write failed', e); }
 
-  res.json({ ok:true, withdrawal: w });
+  res.json({ ok: true, withdrawal: w });
 });
 
 // start
-app.listen(PORT, ()=>{ console.log('AFRIQORA monetization server listening on port', PORT); ensureState(); });
+app.listen(PORT, () => { console.log('AFRIQORA monetization server listening on port', PORT); ensureState(); });

@@ -39,6 +39,7 @@
   "devDependencies": {
     "@capacitor/cli": "^6.2.1",
     "@prisma/client": "^5.22.0",
+    "@prisma/config": "^7.9.1",
     "prisma": "^5.22.0"
   },
   "allowScripts": {
@@ -46,4 +47,6 @@
     "prisma@5.22.0": true,
     "@prisma/engines@5.22.0": true
   }
+}
+}
 }

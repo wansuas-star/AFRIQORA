@@ -6,7 +6,7 @@ import prisma from '../../config/prisma';
 export const register = async (req: Request, res: Response) => {
   try {
     const { email, password, displayName } = req.body;
-    
+
     if (!email || !password || !displayName) {
       return res.status(400).json({ error: 'Email, password, and displayName are required' });
     }

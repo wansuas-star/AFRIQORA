@@ -1,1 +1,56 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Environment files (contain secrets)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Database files (contain user data & binary state)
+*.db
+*.db-*
+*.db.*
+**/*.db
+**/*.db-*
+**/*.db.*
+*.sqlite
+**/*.sqlite
+*.sqlite3
+**/*.sqlite3
+
+# Data backups and JSON state
+server/data.json*
+**/data.json*
+*.stage4-backup
+**/*.stage4-backup
+*.migration-backup
+**/*.migration-backup
+
+# Build artifacts
+backend/dist/
+frontend/dist/
+www/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE & Tooling
+.vscode/
+.idea/
+*.tsbuildinfo
+
+# Capacitor build artifacts
+android/app/build/
+android/.gradle/
+ios/App/build/
+
+# Prisma
+prisma/migrations/migration_lock.toml
+
+# Logs
+*.log
+npm-debug.log*

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SearchItem } from '../types';
 import { searchApi } from '../services/api';
-import { Search, X, Building2, User, FileText, Video, ArrowRight } from 'lucide-react';
+import { Search, X, Building2, User, Globe, ArrowRight } from 'lucide-react';
 
 interface UnifiedSearchModalProps {
   isOpen: boolean;
@@ -40,10 +40,9 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
   if (!isOpen) return null;
 
   const typeIcons: Record<string, React.ReactNode> = {
+    satellite_target: <Globe size={16} style={{ color: '#10b981' }} />,
     businesses: <Building2 size={16} style={{ color: 'var(--accent)' }} />,
-    people: <User size={16} style={{ color: 'var(--gold)' }} />,
-    posts: <FileText size={16} style={{ color: 'var(--green)' }} />,
-    videos: <Video size={16} style={{ color: 'var(--accent-strong)' }} />,
+    users: <User size={16} style={{ color: 'var(--gold)' }} />,
   };
 
   return (
@@ -78,7 +77,7 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
           <input
             type="text"
             autoFocus
-            placeholder="Search African businesses, people, trade posts, or topics..."
+            placeholder="Search satellite AOIs, African enterprises, professional profiles, or locations..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{
@@ -103,11 +102,11 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
           background: 'rgba(255,255,255,0.02)',
           borderBottom: '1px solid var(--border)',
         }}>
-          {['all', 'businesses', 'people', 'posts', 'videos'].map((t) => (
+          {['all', 'satellite', 'businesses', 'users'].map((t) => (
             <button
               key={t}
               onClick={() => setSelectedType(t)}
-              className={`btn ${selectedType === t ? 'btn-primary' : 'btn-ghost'}`}
+              className={'btn ' + (selectedType === t ? 'btn-primary' : 'btn-ghost')}
               style={{
                 fontSize: '0.78rem',
                 padding: '0.25rem 0.75rem',
@@ -115,7 +114,7 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
                 textTransform: 'capitalize',
               }}
             >
-              {t}
+              {t === 'users' ? 'Profiles' : t}
             </button>
           ))}
         </div>
@@ -128,13 +127,13 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
             </div>
           ) : results.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              {query ? 'No matching results found.' : 'Type a query to search across the unified platform.'}
+              {query ? 'No matching results found.' : 'Type a query to search across satellite intelligence, enterprises, and professional profiles.'}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '0.65rem' }}>
               {results.map((item) => (
                 <div
-                  key={`${item.type}-${item.id}`}
+                  key={item.type + '-' + item.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -163,7 +162,7 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <strong style={{ fontSize: '0.95rem' }}>{item.title}</strong>
                         <span className="badge" style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
-                          {item.type}
+                          {item.type.replace('_', ' ')}
                         </span>
                       </div>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>

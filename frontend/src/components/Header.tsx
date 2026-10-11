@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage, Language } from '../context/LanguageContext';
-import { Search, Bell, Globe, User as UserIcon, LogOut, Briefcase, Building2, Shield } from 'lucide-react';
+import { Search, Bell, Globe, User as UserIcon, LogOut, Briefcase, Building2, Shield, Rocket } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <button
-            onClick={() => setActiveTab('feed')}
+            onClick={() => setActiveTab('satellite')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -78,10 +78,10 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - 5 Pillars */}
           <nav className="desktop-nav" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
-              className={`btn ${activeTab === 'satellite' ? 'btn-secondary' : 'btn-ghost'}`}
+              className={'btn ' + (activeTab === 'satellite' ? 'btn-secondary' : 'btn-ghost')}
               onClick={() => setActiveTab('satellite')}
               style={{ fontSize: '0.88rem', color: activeTab === 'satellite' ? '#34d399' : undefined }}
             >
@@ -89,7 +89,15 @@ export const Header: React.FC<HeaderProps> = ({
               Satellite Intel
             </button>
             <button
-              className={`btn ${activeTab === 'businesses' ? 'btn-secondary' : 'btn-ghost'}`}
+              className={'btn ' + (activeTab === 'space-tech' ? 'btn-secondary' : 'btn-ghost')}
+              onClick={() => setActiveTab('space-tech')}
+              style={{ fontSize: '0.88rem', color: activeTab === 'space-tech' ? '#60a5fa' : undefined }}
+            >
+              <Rocket size={16} color="#38bdf8" />
+              Space Tech
+            </button>
+            <button
+              className={'btn ' + (activeTab === 'businesses' ? 'btn-secondary' : 'btn-ghost')}
               onClick={() => setActiveTab('businesses')}
               style={{ fontSize: '0.88rem' }}
             >
@@ -97,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
               Enterprise Directory
             </button>
             <button
-              className={`btn ${activeTab === 'commercial' ? 'btn-secondary' : 'btn-ghost'}`}
+              className={'btn ' + (activeTab === 'commercial' ? 'btn-secondary' : 'btn-ghost')}
               onClick={() => (user ? setActiveTab('commercial') : openAuthModal())}
               style={{ fontSize: '0.88rem' }}
             >
@@ -105,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
               Commercial Hub
             </button>
             <button
-              className={`btn ${activeTab === 'investigations' ? 'btn-secondary' : 'btn-ghost'}`}
+              className={'btn ' + (activeTab === 'investigations' ? 'btn-secondary' : 'btn-ghost')}
               onClick={() => setActiveTab('investigations')}
               style={{ fontSize: '0.88rem', color: activeTab === 'investigations' ? '#38bdf8' : undefined }}
             >
@@ -180,9 +188,9 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
-          {/* Auth State */}
+          {/* User Profile / Auth Button */}
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{
                   width: '2.2rem',

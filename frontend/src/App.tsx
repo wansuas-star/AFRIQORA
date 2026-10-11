@@ -8,6 +8,7 @@ import { AuthModal } from './components/AuthModal';
 import { BusinessDirectory } from './components/BusinessDirectory';
 import { CommercialHub } from './components/CommercialHub';
 import { SatelliteIntelligenceHub } from './components/SatelliteIntelligenceHub';
+import { SpaceTechHub } from './components/SpaceTechHub';
 import { InvestigationWorkspace } from './components/government/InvestigationWorkspace';
 import { UnifiedSearchModal } from './components/UnifiedSearchModal';
 import { NotificationsDrawer } from './components/NotificationsDrawer';
@@ -15,7 +16,7 @@ import { Sparkles, ShieldCheck, Zap } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('satellite');
+  const [activeTab, setActiveTab] = useState('satellite');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -39,17 +40,17 @@ export const App: React.FC = () => {
         setIsNotificationsOpen(false);
         return true;
       }
-      if (activeTab !== 'feed') {
-        setActiveTab('feed');
+      if (activeTab !== 'satellite') {
+        setActiveTab('satellite');
         return true;
       }
-      return false; // Allow app to exit gracefully when at root feed
+      return false; // Exit app if already at root satellite hub
     });
 
     return unregister;
   }, [isAuthModalOpen, isSearchModalOpen, isNotificationsOpen, activeTab]);
 
-  // Periodically check for unread notifications if logged in
+  // Periodically check for operational notifications if logged in
   useEffect(() => {
     if (!user) return;
 
@@ -80,8 +81,8 @@ export const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="main-content-area" style={{ flex: 1 }}>
         <div className="container">
-          {/* Hero for unauthenticated guests */}
-          {!user && activeTab === 'feed' && (
+          {/* Hero Banner for unauthenticated guests visiting Satellite Hub */}
+          {!user && activeTab === 'satellite' && (
             <section style={{
               padding: '2.5rem 0 2rem',
               display: 'grid',
@@ -114,12 +115,15 @@ export const App: React.FC = () => {
                   Earth Observation &amp; AI Change Intelligence
                 </h1>
                 <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1.6, marginBottom: '1.5rem', maxWidth: '540px' }}>
-                  Analyze African mining, maritime ports, and infrastructure via Sentinel-1 SAR &amp; Sentinel-2 Optical earth observations with verifiable multi-sensor evidence.
+                  Analyze African mining, maritime ports, environmental reserves, and infrastructure via Sentinel-1 SAR &amp; Sentinel-2 Optical earth observations with verifiable multi-sensor evidence.
                 </p>
 
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" onClick={() => setActiveTab('satellite')} style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
                     Launch Satellite Intel
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setActiveTab('space-tech')} style={{ padding: '0.75rem 1.5rem' }}>
+                    Space Technologies
                   </button>
                   <button className="btn btn-secondary" onClick={() => setActiveTab('businesses')} style={{ padding: '0.75rem 1.5rem' }}>
                     Enterprise Directory
@@ -136,8 +140,8 @@ export const App: React.FC = () => {
                       <Zap size={18} />
                     </div>
                     <div>
-                      <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.2rem' }}>Total Self-Management</h4>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Register and manage your own business storefront, pricing, and content.</p>
+                      <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.2rem' }}>Space &amp; Geospatial Intelligence</h4>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Advanced African space technologies, orbital tracking, and high-cadence satellite analytics.</p>
                     </div>
                   </div>
 
@@ -146,8 +150,8 @@ export const App: React.FC = () => {
                       <ShieldCheck size={18} />
                     </div>
                     <div>
-                      <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.2rem' }}>Zero Data Selling</h4>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Personal user data is never sold. All analytics use privacy-preserving aggregates.</p>
+                      <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.2rem' }}>Zero Social Selling &amp; Pure Confidentiality</h4>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>No social feeds or ad profiling. Investigative workspaces enforce strict Owner-Only access governance.</p>
                     </div>
                   </div>
                 </div>
@@ -155,15 +159,16 @@ export const App: React.FC = () => {
             </section>
           )}
 
-          {/* Active Tab View */}
+          {/* Active 5 Pillar Views */}
           {activeTab === 'satellite' && <SatelliteIntelligenceHub />}
+          {activeTab === 'space-tech' && <SpaceTechHub />}
           {activeTab === 'businesses' && <BusinessDirectory openAuthModal={() => setIsAuthModalOpen(true)} />}
           {activeTab === 'commercial' && <CommercialHub openAuthModal={() => setIsAuthModalOpen(true)} />}
           {activeTab === 'investigations' && <InvestigationWorkspace />}
         </div>
       </main>
 
-      {/* Desktop Footer (Hidden on Mobile) */}
+      {/* Desktop Footer */}
       <footer className="desktop-footer" style={{
         borderTop: '1px solid var(--border)',
         padding: '2rem 0',
@@ -179,16 +184,18 @@ export const App: React.FC = () => {
           fontSize: '0.85rem',
           color: 'var(--text-muted)',
         }}>
-          <div>© {new Date().getFullYear()} AFRIQORA. All rights reserved. Self-service African business infrastructure.</div>
+          <div>© {new Date().getFullYear()} AFRIQORA. Intelligence, Information &amp; African Space Technologies Platform.</div>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
-            <button onClick={() => setActiveTab('feed')} className="btn btn-ghost" style={{ padding: 0 }}>Feed</button>
-            <button onClick={() => setActiveTab('businesses')} className="btn btn-ghost" style={{ padding: 0 }}>Businesses</button>
-            <button onClick={() => setActiveTab('creator')} className="btn btn-ghost" style={{ padding: 0 }}>Creator Hub</button>
+            <button onClick={() => setActiveTab('satellite')} className="btn btn-ghost" style={{ padding: 0 }}>Satellite Intel</button>
+            <button onClick={() => setActiveTab('space-tech')} className="btn btn-ghost" style={{ padding: 0 }}>Space Tech</button>
+            <button onClick={() => setActiveTab('businesses')} className="btn btn-ghost" style={{ padding: 0 }}>Directory</button>
+            <button onClick={() => setActiveTab('commercial')} className="btn btn-ghost" style={{ padding: 0 }}>Commercial Hub</button>
+            <button onClick={() => setActiveTab('investigations')} className="btn btn-ghost" style={{ padding: 0 }}>Investigations</button>
           </div>
         </div>
       </footer>
 
-      {/* Mobile Bottom Navigation Bar (Visible on mobile viewports) */}
+      {/* Mobile Bottom Navigation Bar */}
       <MobileBottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -207,4 +214,3 @@ export const App: React.FC = () => {
     </div>
   );
 };
-

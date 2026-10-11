@@ -1,267 +1,174 @@
 import {
   User,
   BusinessProfile,
-  Post,
-  Wallet,
   Withdrawal,
   Notification,
-  Message,
   SearchItem,
-  AuthResponse,
   AdCampaign,
-  MerchantTransaction,
-  BusinessVerification,
-  MerchantAnalytics,
+  MerchantTransaction
 } from '../types';
 
-// Dynamic API Base: Defaults to relative '/api' for web, supports VITE_API_URL / window.AFRIQORA_API_BASE for mobile apps
-const API_BASE = (import.meta.env.VITE_API_URL as string) || (typeof window !== 'undefined' && (window as any).AFRIQORA_API_BASE) || '/api';
+const API_BASE = '/api';
 
-export function getStoredToken(): string | null {
-  return localStorage.getItem('afr_token') || null;
-}
+export const getStoredToken = (): string | null => {
+  return localStorage.getItem('afriqora_token');
+};
 
-export function setStoredToken(token: string | null): void {
+export const setStoredToken = (token: string | null) => {
   if (token) {
-    localStorage.setItem('afr_token', token);
+    localStorage.setItem('afriqora_token', token);
   } else {
-    localStorage.removeItem('afr_token');
+    localStorage.removeItem('afriqora_token');
   }
-}
+};
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const token = getStoredToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(options?.headers as Record<string, string>),
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers['Authorization'] = 'Bearer ' + token;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(API_BASE + endpoint, {
     ...options,
     headers,
   });
 
-  const data = await res.json().catch(() => ({}));
-
   if (!res.ok) {
-    const errorMsg = data.error?.message || data.error || `Request failed with status ${res.status}`;
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    const errorMsg = data.error?.message || data.error || ('Request failed with status ' + res.status);
     throw new Error(errorMsg);
   }
 
-  return data as T;
+  return res.json();
 }
 
 // 1. Auth API
 export const authApi = {
-  login: (email: string, password: string) =>
-    request<AuthResponse>('/auth/login', {
+  login: (email: string, pass: string) =>
+    request<{ token: string; user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password: pass }),
     }),
 
-  register: (email: string, password: string, displayName: string) =>
-    request<AuthResponse>('/auth/register', {
+  register: (email: string, pass: string, name: string) =>
+    request<{ token: string; user: User }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ email, password: pass, displayName: name }),
     }),
 
-  getProfile: () => request<{ user: User }>('/users/me'),
+  getProfile: () => request<{ user: User }>('/users/profile'),
 };
 
-// 2. Feed & Posts API
-export const feedApi = {
-  getHomeFeed: () => request<{ posts: Post[] }>('/feed/home'),
-
-  createPost: (postData: {
-    title?: string;
-    text: string;
-    category?: string;
-    location?: string;
-    image?: string;
-    video?: string;
-  }) =>
-    request<{ post: Post }>('/feed', {
-      method: 'POST',
-      body: JSON.stringify(postData),
-    }),
-};
-
-// 3. Creator & Business API
+// 2. Enterprise & Business Profile API
 export const creatorApi = {
-  getDashboard: () =>
-    request<{
-      wallet: Wallet;
-      businessProfile: BusinessProfile | null;
-      posts: Post[];
-      viewsThreshold: number;
-    }>('/creator/dashboard'),
-
-  upsertBusinessProfile: (data: Partial<BusinessProfile>) =>
+  upsertBusinessProfile: (profile: Partial<BusinessProfile>) =>
     request<{ businessProfile: BusinessProfile }>('/creator/business-profile', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(profile),
     }),
 
-  getPublicProfile: (id: string) =>
-    request<{ user: User; businessProfile: BusinessProfile | null }>(`/creator/${encodeURIComponent(id)}`),
+  saveBusinessProfile: (profile: Partial<BusinessProfile>) =>
+    request<{ businessProfile: BusinessProfile }>('/creator/business-profile', {
+      method: 'POST',
+      body: JSON.stringify(profile),
+    }),
 
-  requestWithdrawal: (amount: number, method = 'bank_transfer') =>
+  getBusinessProfile: (id: string) =>
+    request<{ user: User; businessProfile: BusinessProfile | null }>('/creator/' + encodeURIComponent(id)),
+
+  requestPayout: (amount: number, method: string, details: string) =>
     request<{ withdrawal: Withdrawal; message: string }>('/creator/withdraw', {
       method: 'POST',
-      body: JSON.stringify({ amount, method }),
+      body: JSON.stringify({ amount, method, details }),
     }),
 };
 
-// 4. Unified Search API
-export const searchApi = {
-  search: (q: string, types = 'all', limit = 20) =>
-    request<{ ok: boolean; items: SearchItem[]; totalCount: number; hasMore: boolean }>(
-      `/search?q=${encodeURIComponent(q)}&types=${encodeURIComponent(types)}&limit=${limit}`
-    ),
-};
+export const businessApi = creatorApi;
 
-// 5. Notifications & Connections API
+// 3. Operational Notifications API
 export const notificationsApi = {
-  getNotifications: (limit = 30) =>
-    request<{ ok: boolean; items: Notification[]; unreadCount: number }>(`/notifications?limit=${limit}`),
+  getNotifications: (limit: number = 20) =>
+    request<{ items: Notification[]; unreadCount: number }>('/notifications?limit=' + limit),
 
   markAsRead: (id: string) =>
-    request<{ ok: boolean; id: string }>(`/notifications/${encodeURIComponent(id)}/read`, {
+    request<{ success: boolean }>('/notifications/' + encodeURIComponent(id) + '/read', {
       method: 'POST',
     }),
 
   markAllRead: () =>
-    request<{ ok: boolean }>('/notifications/read-all', {
+    request<{ success: boolean }>('/notifications/read-all', {
       method: 'POST',
-    }),
-
-  sendConnectionRequest: (targetUserId: string, message?: string) =>
-    request<{ ok: boolean; connectionRequest: any }>('/notifications/connections/request', {
-      method: 'POST',
-      body: JSON.stringify({ targetUserId, message }),
-    }),
-
-  respondConnectionRequest: (requesterId: string, accept: boolean) =>
-    request<{ ok: boolean; connectionRequest: any }>('/notifications/connections/respond', {
-      method: 'POST',
-      body: JSON.stringify({ requesterId, accept }),
     }),
 };
 
-// 6. Direct Messaging API
-export const messagingApi = {
-  sendMessage: (recipientId: string, content: string) =>
-    request<{ message: Message }>('/messages', {
-      method: 'POST',
-      body: JSON.stringify({ recipientId, content }),
-    }),
-
-  getThread: (peerId: string) =>
-    request<{ messages: Message[] }>(`/messages/${encodeURIComponent(peerId)}`),
-};
-
-// 7. Users API
+// 4. Professional User Profiles API
 export const usersApi = {
-  followUser: (userId: string) =>
-    request<{ status: 'followed' | 'unfollowed' }>(`/users/${encodeURIComponent(userId)}/follow`, {
-      method: 'POST',
+  getProfile: () => request<{ user: User }>('/users/profile'),
+
+  updateProfile: (profileData: Partial<User>) =>
+    request<{ user: User }>('/users/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
     }),
 };
 
-// 8. Commercial & Merchant API
-export const commercialApi = {
-  getMerchantBusiness: () =>
-    request<{ business: BusinessProfile }>('/commercial/business'),
+// 5. Unified Search API
+export const searchApi = {
+  search: (q: string, type: string = 'all', limit: number = 20) =>
+    request<{ count: number; items: SearchItem[] }>('/search?q=' + encodeURIComponent(q) + '&type=' + encodeURIComponent(type) + '&limit=' + limit),
+};
 
-  submitVerification: (data: { registrationNumber?: string; taxId?: string; documentUrl?: string }) =>
-    request<{ success: boolean; verification: BusinessVerification }>('/commercial/verify', {
+// 6. Commercial Self-Service Infrastructure API
+export const commercialApi = {
+  createCampaign: (campaign: { title: string; objective: string; placement: string; budgetTotal: number; dailyBudget: number; startDate: string; endDate?: string }) =>
+    request<{ success: boolean; campaign: AdCampaign; message: string }>('/commercial/campaigns', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(campaign),
     }),
 
   getCampaigns: () =>
-    request<{ campaigns: AdCampaign[] }>('/commercial/campaigns'),
+    request<{ success: boolean; campaigns: AdCampaign[] }>('/commercial/campaigns'),
 
-  createCampaign: (data: {
-    title: string;
-    placement?: string;
-    targetCategory?: string;
-    targetLocation?: string;
-    dailyBudget: number;
-    totalBudget: number;
-    headline: string;
-    description?: string;
-    ctaText?: string;
-    ctaUrl?: string;
-    mediaUrl?: string;
-  }) =>
-    request<{ success: boolean; campaign: AdCampaign; message: string }>('/commercial/campaigns', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  updateCampaignStatus: (id: string, status: 'active' | 'paused') =>
-    request<{ success: boolean; campaign: AdCampaign }>(`/commercial/campaigns/${encodeURIComponent(id)}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    }),
-
-  recordAdClick: (campaignId: string, nonce: string) =>
-    request<{ success: boolean; targetUrl: string; exhausted: boolean }>('/commercial/ads/click', {
-      method: 'POST',
-      body: JSON.stringify({ campaignId, nonce }),
-    }),
-
-  getMerchantAnalytics: () =>
-    request<MerchantAnalytics>('/commercial/analytics'),
-
-  depositBudget: (data: { campaignId?: string; amount: number; paymentMethod?: string; reference: string }) =>
+  createDeposit: (amount: number, currency: string, paymentMethod: string) =>
     request<{ success: boolean; transaction: MerchantTransaction; message: string }>('/commercial/billing/deposit', {
       method: 'POST',
+      body: JSON.stringify({ amount, currency, paymentMethod }),
+    }),
+
+  getBillingSummary: () =>
+    request<{ success: boolean; summary: any }>('/commercial/billing/summary'),
+
+  submitVerification: (data: { businessName: string; registrationNumber?: string; taxId?: string; documentsUrl?: string }) =>
+    request<{ success: boolean; message: string }>('/commercial/verification', {
+      method: 'POST',
       body: JSON.stringify(data),
     }),
-
-  getBillingHistory: () =>
-    request<{ transactions: MerchantTransaction[] }>('/commercial/billing/history'),
 };
 
-// 9. Admin Moderation API
+// 7. Administrative Moderation API
 export const adminApi = {
   getPendingModeration: () =>
-    request<{ pendingCampaigns: any[]; pendingVerifications: any[] }>('/admin/moderation/pending'),
+    request<{ success: boolean; campaigns: AdCampaign[]; verifications: BusinessProfile[] }>('/admin/moderation/pending'),
 
-  moderateCampaign: (id: string, action: 'approve' | 'reject', reason?: string) =>
-    request<{ success: boolean; message: string }>(`/admin/moderation/campaign/${encodeURIComponent(id)}`, {
+  moderateCampaign: (id: string, action: 'approve' | 'reject', notes?: string) =>
+    request<{ success: boolean; message: string }>('/admin/moderation/campaign/' + encodeURIComponent(id), {
       method: 'POST',
-      body: JSON.stringify({ action, reason }),
+      body: JSON.stringify({ action, notes }),
     }),
 
-  moderateVerification: (id: string, action: 'approve' | 'reject', adminNotes?: string) =>
-    request<{ success: boolean; message: string }>(`/admin/moderation/verification/${encodeURIComponent(id)}`, {
+  moderateVerification: (id: string, action: 'approve' | 'reject', notes?: string) =>
+    request<{ success: boolean; message: string }>('/admin/moderation/verification/' + encodeURIComponent(id), {
       method: 'POST',
-      body: JSON.stringify({ action, adminNotes }),
-    }),
-
-  getPlatformOverview: () =>
-    request<{ totalCampaigns: number; activeCampaigns: number; verifiedBusinesses: number; totalCommercialRevenue: number }>(
-      '/admin/commercial/overview'
-    ),
-};
-
-export const satelliteApi = {
-  getStatus: () => request<any>('/satellite/status'),
-  getTargets: () => request<{ ok: boolean; targets: any[] }>('/satellite/targets'),
-  searchScenes: (params: { bbox?: string; startDate?: string; endDate?: string; provider?: string }) => {
-    const qs = new URLSearchParams(params as any).toString();
-    return request<{ ok: boolean; count: number; scenes: any[] }>(`/satellite/scenes?${qs}`);
-  },
-  queryIntelligence: (query: string, customBbox?: [number, number, number, number], targetId?: string) =>
-    request<any>('/satellite/query', {
-      method: 'POST',
-      body: JSON.stringify({ query, customBbox, targetId }),
+      body: JSON.stringify({ action, notes }),
     }),
 };

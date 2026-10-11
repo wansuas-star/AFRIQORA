@@ -2,13 +2,10 @@ import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../../shared/auth.middleware';
 import prisma from '../../config/prisma';
 
-// Static permissions map (replicated from legacy)
+// Enterprise OIDC and verified identity providers only (Social-media connectors removed)
 const CONNECT_PERMISSIONS: Record<string, string[]> = {
   google: ['profile', 'email'],
-  facebook: ['public_profile', 'email'],
-  twitter: ['tweet.read', 'users.read'],
-  instagram: ['user_profile', 'user_media'],
-  tiktok: ['user.info.basic', 'video.list'],
+  enterprise_oidc: ['identity', 'email', 'organization'],
 };
 
 // GET /api/connect/permissions
@@ -43,7 +40,7 @@ export const connectService = async (req: AuthenticatedRequest, res: Response) =
     const userId = req.userId!;
 
     if (!serviceName || !CONNECT_PERMISSIONS[serviceName]) {
-      return res.status(400).json({ error: `Unknown service: ${serviceName}` });
+      return res.status(400).json({ error: 'Unknown or unsupported service: ' + serviceName + '. Social media connections are decommissioned.' });
     }
 
     const serializedPermissions = Array.isArray(permissions)
@@ -74,7 +71,7 @@ export const disconnectService = async (req: AuthenticatedRequest, res: Response
       where: { userId, serviceName: serviceParam },
     });
 
-    res.json({ success: true, message: `Disconnected from ${serviceParam}` });
+    res.json({ success: true, message: 'Disconnected from ' + serviceParam });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

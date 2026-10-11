@@ -5,13 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.disconnectService = exports.connectService = exports.getConnectedServices = exports.getPermissions = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
-// Static permissions map (replicated from legacy)
+// Enterprise OIDC and verified identity providers only (Social-media connectors removed)
 const CONNECT_PERMISSIONS = {
     google: ['profile', 'email'],
-    facebook: ['public_profile', 'email'],
-    twitter: ['tweet.read', 'users.read'],
-    instagram: ['user_profile', 'user_media'],
-    tiktok: ['user.info.basic', 'video.list'],
+    enterprise_oidc: ['identity', 'email', 'organization'],
 };
 // GET /api/connect/permissions
 const getPermissions = (_req, res) => {
@@ -43,7 +40,7 @@ const connectService = async (req, res) => {
         const { serviceName, permissions } = req.body;
         const userId = req.userId;
         if (!serviceName || !CONNECT_PERMISSIONS[serviceName]) {
-            return res.status(400).json({ error: `Unknown service: ${serviceName}` });
+            return res.status(400).json({ error: 'Unknown or unsupported service: ' + serviceName + '. Social media connections are decommissioned.' });
         }
         const serializedPermissions = Array.isArray(permissions)
             ? permissions.join(',')
@@ -70,7 +67,7 @@ const disconnectService = async (req, res) => {
         await prisma_1.default.serviceConnection.deleteMany({
             where: { userId, serviceName: serviceParam },
         });
-        res.json({ success: true, message: `Disconnected from ${serviceParam}` });
+        res.json({ success: true, message: 'Disconnected from ' + serviceParam });
     }
     catch (error) {
         console.error(error);

@@ -21,19 +21,23 @@ const commercial_routes_1 = __importDefault(require("./modules/commercial/commer
 const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
 const satellite_routes_1 = __importDefault(require("./modules/satellite/satellite.routes"));
 const government_routes_1 = __importDefault(require("./modules/government/government.routes"));
+// Decommissioned Social Media Routers
+const feed_routes_1 = __importDefault(require("./modules/feed/feed.routes"));
+const creator_routes_1 = __importDefault(require("./modules/creator/creator.routes"));
+const messaging_routes_1 = __importDefault(require("./modules/messaging/messaging.routes"));
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use((req, _res, next) => {
     if (!req.url.startsWith('/assets') && !req.url.endsWith('.ico') && !req.url.endsWith('.png')) {
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+        console.log('[' + new Date().toISOString() + '] ' + req.method + ' ' + req.url);
     }
     next();
 });
-// Flagship Satellite Earth Observation Intelligence API
+// Flagship Satellite Earth Observation Intelligence API (ML-01 Foundation)
 app.use('/api/satellite', satellite_routes_1.default);
 // Government Investigative Intelligence & Universal Integration API
 app.use('/api/gov', government_routes_1.default);
-// Core Enterprise & Authentication API Routes
+// Core Enterprise, Identity & Commercial API Routes
 app.use('/api/auth', auth_routes_1.default);
 app.use('/api/users', users_routes_1.default);
 app.use('/api/commercial', commercial_routes_1.default);
@@ -42,13 +46,27 @@ app.use('/api/monetization', monetization_routes_1.default);
 app.use('/api/connect', connect_routes_1.default);
 app.use('/api/search', search_routes_1.default);
 app.use('/api/notifications', notifications_routes_1.default);
+// Decommissioned Social Media Endpoints (HTTP 410 Gone)
+const decommissionedSocialHandler = (_req, res) => {
+    res.status(410).json({
+        error: 'AFRIQORA is an intelligence, information, and space-technology platform. Social-media functionality has been permanently decommissioned.',
+        code: 'SOCIAL_MEDIA_DECOMMISSIONED'
+    });
+};
+app.use('/api/feed', feed_routes_1.default);
+app.use('/api/creator', creator_routes_1.default);
+app.use('/api/messages', messaging_routes_1.default);
+app.use('/api/messaging', messaging_routes_1.default);
+app.use('/api/interactions', decommissionedSocialHandler);
+app.use('/api/comments', decommissionedSocialHandler);
+app.use('/api/social', decommissionedSocialHandler);
 // Health checks
 app.get('/api/health', (_req, res) => {
     res.json({
         status: 'ok',
         environment: process.env.NODE_ENV || 'staging',
         timestamp: new Date().toISOString(),
-        platform: 'AFRIQORA Satellite Intelligence (ML-01)',
+        platform: 'AFRIQORA Satellite Intelligence & Space Technologies (ML-01)',
         version: '2.0.0-staging'
     });
 });
@@ -57,7 +75,7 @@ app.get('/health', (_req, res) => {
         ok: true,
         now: Date.now(),
         environment: process.env.NODE_ENV || 'staging',
-        platform: 'AFRIQORA Satellite Intelligence (ML-01)'
+        platform: 'AFRIQORA Satellite Intelligence & Space Technologies (ML-01)'
     });
 });
 // Serve frontend production build if available
@@ -75,7 +93,7 @@ for (const p of frontendDistPaths) {
     }
 }
 if (frontendDist) {
-    console.log(`Serving frontend staging build from: ${frontendDist}`);
+    console.log('Serving frontend staging build from: ' + frontendDist);
     app.use(express_1.default.static(frontendDist));
     app.use((req, res, next) => {
         if (req.method === 'GET' && !req.url.startsWith('/api')) {
@@ -92,11 +110,11 @@ app.use((err, _req, res, _next) => {
     });
 });
 app.listen(port, () => {
-    console.log(`======================================================================`);
-    console.log(`AFRIQORA Satellite Intelligence Staging Environment Online`);
-    console.log(`URL: http://localhost:${port}`);
-    console.log(`Health Check: http://localhost:${port}/api/health`);
-    console.log(`Satellite API: http://localhost:${port}/api/satellite/status`);
-    console.log(`======================================================================`);
+    console.log('======================================================================');
+    console.log('AFRIQORA Satellite Intelligence & Space Technologies Staging Online');
+    console.log('URL: http://localhost:' + port);
+    console.log('Health Check: http://localhost:' + port + '/api/health');
+    console.log('Satellite API: http://localhost:' + port + '/api/satellite/status');
+    console.log('======================================================================');
 });
 exports.default = app;

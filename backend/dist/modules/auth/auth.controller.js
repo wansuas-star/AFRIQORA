@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.logout = exports.login = exports.register = void 0;
+exports.login = exports.register = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../../config/prisma"));
@@ -56,9 +56,3 @@ const login = async (req, res) => {
     }
 };
 exports.login = login;
-const logout = async (req, res) => {
-    // Since we use stateless JWTs via Bearer token, we just acknowledge the logout.
-    // The client is responsible for discarding the token.
-    res.json({ ok: true, message: 'Logged out successfully' });
-};
-exports.logout = logout;

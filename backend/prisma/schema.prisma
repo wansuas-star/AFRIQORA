@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -8,136 +9,635 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  afriqoraId   String   @unique
-  email        String   @unique
-  passwordHash String
-  displayName  String
-  bio          String?
-  profilePhoto String?
-  createdAt    DateTime @default(now())
+  id                  String              @id @default(uuid())
+  afriqoraId          String?             @unique
+  email               String              @unique
+  passwordHash        String
+  displayName         String
+  username            String?             @unique
+  bio                 String?
+  location            String?
+  website             String?
+  contact             String?
+  profilePhoto        String?
+  createdAt           DateTime            @default(now())
+  
+  // Security & Preferences
+  twoFactor           Boolean             @default(false)
+  isPlatformOwner     Boolean             @default(false)
+  profileVisibility   String              @default("public") // public | connections | private
+  sessionTimeout      String              @default("30d")     // 15m | 1h | 1d | 30d
 
-  posts        Post[]
-  messagesSent Message[] @relation("SentMessages")
-  messagesRecv Message[] @relation("ReceivedMessages")
-  followers    Follow[]  @relation("UserFollowers")
-  following    Follow[]  @relation("UserFollowing")
-  likes        Like[]
-  comments     Comment[]
+  sessions            Session[]
+  businesses          BusinessProfile[]
+  followingBusinesses BusinessFollow[]
+  sentRequests        ConnectionRequest[] @relation("SentRequests")
+  receivedRequests    ConnectionRequest[] @relation("ReceivedRequests")
+  blocksMade          UserBlock[]         @relation("BlockerUsers")
+  blocksReceived      UserBlock[]         @relation("BlockedUsers")
+  serviceConnects     ServiceConnection[]
+  sentEnquiries       BusinessEnquiry[]
+  givenReviews        BusinessReview[]
+  wallet              Wallet?
+  withdrawals         Withdrawal[]
+  reportsFiled        Report[]
+  governmentOfficer   GovernmentOfficer?
 }
 
-model Follow {
+model BusinessFollow {
+  id         String          @id @default(uuid())
+  followerId String
+  businessId String
+  createdAt  DateTime        @default(now())
+
+  follower   User            @relation(fields: [followerId], references: [id])
+  business   BusinessProfile @relation(fields: [businessId], references: [id])
+
+  @@unique([followerId, businessId])
+}
+
+model ConnectionRequest {
   id          String   @id @default(uuid())
-  followerId  String
-  followingId String
+  requesterId String
+  targetId    String
+  status      String   @default("pending") // pending | accepted | declined
+  message     String?
   createdAt   DateTime @default(now())
 
-  follower  User @relation("UserFollowing", fields: [followerId], references: [id])
-  following User @relation("UserFollowers", fields: [followingId], references: [id])
+  requester   User     @relation("SentRequests", fields: [requesterId], references: [id])
+  target      User     @relation("ReceivedRequests", fields: [targetId], references: [id])
 
-  @@unique([followerId, followingId])
+  @@unique([requesterId, targetId])
 }
 
-model Post {
-  id          String   @id @default(uuid())
-  authorId    String
-  title       String?
-  content     String
-  mediaUrl    String?
-  contentType String   @default("post")
-  createdAt   DateTime @default(now())
-
-  author   User      @relation(fields: [authorId], references: [id])
-  likes    Like[]
-  comments Comment[]
-}
-
-model Like {
+model Session {
   id        String   @id @default(uuid())
   userId    String
-  postId    String
   createdAt DateTime @default(now())
+  expiresAt DateTime
 
-  user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id])
-
-  @@unique([userId, postId])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
-model Comment {
+model BusinessProfile {
+  id                 String                @id @default(uuid())
+  ownerId            String
+  businessName       String
+  location           String?
+  country            String?
+  category           String
+  description        String?
+  phone              String?
+  website            String?
+  logo               String?
+  hours              String?               // JSON string
+  categories         String?               // JSON string
+  services           String?               // JSON string
+  socialLinks        String?               // JSON string
+  serviceAreas       String?               // JSON string
+  languagesServed    String?               // JSON string
+  faqs               String?               // JSON string
+  media              String?               // JSON string
+  semanticIndex      String?
+  isMarketplace      Boolean               @default(true)
+  isVerified         Boolean               @default(false)
+  verificationStatus String                @default("unverified") // unverified | pending | verified | rejected
+  verificationDoc    String?
+  createdAt          DateTime              @default(now())
+
+  owner              User                  @relation(fields: [ownerId], references: [id])
+  followers          BusinessFollow[]
+  enquiries          BusinessEnquiry[]
+  reviews            BusinessReview[]
+  campaigns          AdCampaign[]
+  transactions       MerchantTransaction[]
+  verification       BusinessVerification?
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  recipientUserId String
+  actorUserId     String?
+  type            String   // system | alert | satellite_change | business_enquiry
+  title           String?
+  message         String?
+  route           String?
+  metadata        String?  // JSON payload
+  read            Boolean  @default(false)
+  dedupeKey       String?  @unique
+  createdAt       DateTime @default(now())
+}
+
+model UserBlock {
   id        String   @id @default(uuid())
-  userId    String
-  postId    String
-  content   String
+  blockerId String
+  blockedId String
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id])
-}
+  blocker   User     @relation("BlockerUsers", fields: [blockerId], references: [id])
+  blocked   User     @relation("BlockedUsers", fields: [blockedId], references: [id])
 
-model Message {
-  id         String   @id @default(uuid())
-  senderId   String
-  receiverId String
-  content    String
-  createdAt  DateTime @default(now())
-
-  sender   User @relation("SentMessages", fields: [senderId], references: [id])
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
-}
-model VideoViewNonce {
-  id        String   @id @default(uuid())
-  videoId   String
-  nonce     String
-  createdAt DateTime @default(now())
-
-  @@unique([videoId, nonce])
+  @@unique([blockerId, blockedId])
 }
 
 model ServiceConnection {
   id          String   @id @default(uuid())
   userId      String
   serviceName String
-  permissions String
+  permissions String   // JSON array of strings
   createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, serviceName])
 }
 
-model BusinessProfile {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  businessName String
-  category     String
-  description  String?
-  website      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model BusinessEnquiry {
+  id          String          @id @default(uuid())
+  businessId  String
+  senderId    String
+  message     String
+  contactMode String          @default("direct") // direct | email | phone
+  status      String          @default("pending") // pending | answered | archived
+  createdAt   DateTime        @default(now())
+
+  business    BusinessProfile @relation(fields: [businessId], references: [id])
+  sender      User            @relation(fields: [senderId], references: [id])
+}
+
+model BusinessReview {
+  id         String          @id @default(uuid())
+  businessId String
+  reviewerId String
+  rating     Int             // 1 to 5
+  text       String?
+  createdAt  DateTime        @default(now())
+
+  business   BusinessProfile @relation(fields: [businessId], references: [id])
+  reviewer   User            @relation(fields: [reviewerId], references: [id])
+
+  @@unique([businessId, reviewerId])
 }
 
 model Wallet {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  earnings  Float    @default(0)
-  views     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  totalViews       Int      @default(0)
+  earnings         Float    @default(0.0)
+  availableBalance Float    @default(0.0)
 
-  withdrawals Withdrawal[]
+  user             User     @relation(fields: [userId], references: [id])
 }
 
 model Withdrawal {
   id        String   @id @default(uuid())
-  walletId  String
+  userId    String
   amount    Float
-  status    String   @default("pending")
+  method    String   // bank | mpesa | flutterwave
+  status    String   @default("pending") // pending | completed | failed
   createdAt DateTime @default(now())
 
-  wallet Wallet @relation(fields: [walletId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model GlobalSettings {
-  id            String   @id @default("singleton")
-  totalEarnings Float    @default(0)
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(uuid())
+  platformPct    Float    @default(0.3)
+  creatorPct     Float    @default(0.7)
+  viewValue      Float    @default(0.01)
+  totalEarnings  Float    @default(0.0)
+  smartReachCfg  String?  // JSON string
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String
+  entityId    String
+  entityType  String   // business | satellite_job | account
+  reason      String
+  details     String?
+  status      String   @default("open") // open | resolved | dismissed
+  createdAt   DateTime @default(now())
+
+  reporter    User     @relation(fields: [reporterId], references: [id])
+}
+
+model AdCampaign {
+  id              String                @id @default(uuid())
+  businessId      String
+  title           String
+  placement       String                @default("search") // search | directory | satellite_sidebar
+  targetCategory  String?
+  targetLocation  String?
+  dailyBudget     Float
+  totalBudget     Float
+  spentAmount     Float                 @default(0.0)
+  cpcRate         Float                 @default(0.20)
+  cpmRate         Float                 @default(2.50)
+  impressions     Int                   @default(0)
+  clicks          Int                   @default(0)
+  status          String                @default("pending_review") // pending_review | active | paused | completed | rejected
+  headline        String
+  description     String
+  ctaText         String                @default("Learn More")
+  ctaUrl          String
+  mediaUrl        String?
+  rejectionReason String?
+  reviewedAt      DateTime?
+  startDate       DateTime              @default(now())
+  endDate         DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  business        BusinessProfile       @relation(fields: [businessId], references: [id])
+  transactions    MerchantTransaction[]
+  adEvents        AdEventNonce[]
+}
+
+model AdEventNonce {
+  id          String     @id @default(uuid())
+  campaignId  String
+  viewerHash  String
+  eventType   String     // impression | click
+  nonce       String
+  createdAt   DateTime   @default(now())
+
+  campaign    AdCampaign @relation(fields: [campaignId], references: [id])
+
+  @@unique([campaignId, nonce, eventType])
+}
+
+model MerchantTransaction {
+  id              String          @id @default(uuid())
+  businessId      String
+  campaignId      String?
+  amount          Float
+  currency        String          @default("USD")
+  paymentMethod   String          // "mpesa_mock" | "card_mock" | "flutterwave_mock"
+  status          String          @default("completed") // pending | completed | failed | refunded
+  reference       String          @unique
+  description     String?
+  createdAt       DateTime        @default(now())
+
+  business        BusinessProfile @relation(fields: [businessId], references: [id])
+  campaign        AdCampaign?     @relation(fields: [campaignId], references: [id])
+}
+
+model BusinessVerification {
+  id                 String          @id @default(uuid())
+  businessId         String          @unique
+  registrationNumber String?
+  taxId              String?
+  documentUrl        String?
+  status             String          @default("pending") // pending | approved | rejected
+  adminNotes         String?
+  reviewedAt         DateTime?
+  createdAt          DateTime        @default(now())
+
+  business           BusinessProfile @relation(fields: [businessId], references: [id])
+}
+
+// ==========================================
+// SATELLITE EARTH-OBSERVATION INTELLIGENCE (ML-01)
+// ==========================================
+
+model SatelliteTarget {
+  id           String                 @id @default(uuid())
+  name         String
+  category     String                 // "mining" | "port" | "infrastructure" | "agriculture" | "urban" | "general"
+  country      String
+  bbox         String                 // JSON: [minLon, minLat, maxLon, maxLat]
+  geometry     String?                // GeoJSON Polygon
+  centerLat    Float
+  centerLon    Float
+  description  String?
+  createdAt    DateTime               @default(now())
+
+  observations SatelliteObservation[]
+  analysisJobs ChangeAnalysisJob[]
+  reports      IntelligenceReport[]
+}
+
+model SatelliteObservation {
+  id               String              @id @default(uuid())
+  targetId         String
+  provider         String              // "copernicus_cdse" | "aws_stac" | "planet_commercial" | "modular_adapter"
+  platform         String              // "Sentinel-1A" | "Sentinel-1B" | "Sentinel-2A" | "Sentinel-2B" | "Commercial-HR"
+  sensorType       String              // "SAR_C_BAND" | "OPTICAL_MSI" | "OPTICAL_VERY_HIGH_RES"
+  acquisitionDate  DateTime
+  cloudCover       Float?              // 0.0 to 100.0 (null/0 for SAR)
+  polarization     String?             // e.g. "VV+VH", "HH+HV"
+  orbitDirection   String?             // "ASCENDING" | "DESCENDING"
+  resolutionMeters Float               // e.g. 10.0, 3.0, 0.5
+  bands            String              // JSON list or dictionary of available bands
+  thumbnailUrl     String?
+  tileUrl          String?
+  metadata         String?             // JSON string of telemetry & processing parameters
+  createdAt        DateTime            @default(now())
+
+  target           SatelliteTarget     @relation(fields: [targetId], references: [id])
+  asBeforeJobs     ChangeAnalysisJob[] @relation("BeforeObservation")
+  asAfterJobs      ChangeAnalysisJob[] @relation("AfterObservation")
+}
+
+model ChangeAnalysisJob {
+  id                  String               @id @default(uuid())
+  targetId            String
+  beforeObservationId String
+  afterObservationId  String
+  analysisType        String               // "mining_expansion" | "vegetation_loss" | "port_vessel_activity" | "urban_construction" | "general_change"
+  pipelineUsed        String               // "SENTINEL1_SAR_DIFFERENCE" | "SENTINEL2_OPTICAL_NDVI" | "FUSED_MULTI_SENSOR"
+  status              String               @default("completed") // pending | running | completed | failed
+  changeDetected      Boolean              @default(false)
+  changeAreaHectares  Float                @default(0.0)
+  changeVectorGeoJson String?              // GeoJSON FeatureCollection
+  metrics             String?              // JSON object of quantitative deltas
+  confidenceScore     Float                @default(0.0) // 0.0 to 1.0
+  createdAt           DateTime             @default(now())
+
+  target              SatelliteTarget      @relation(fields: [targetId], references: [id])
+  beforeObservation   SatelliteObservation @relation("BeforeObservation", fields: [beforeObservationId], references: [id])
+  afterObservation    SatelliteObservation @relation("AfterObservation", fields: [afterObservationId], references: [id])
+  reports             IntelligenceReport[]
+}
+
+model IntelligenceReport {
+  id                  String             @id @default(uuid())
+  targetId            String?
+  analysisJobId       String?
+  userQuery           String
+  parsedLocation      String
+  parsedTimeWindow    String
+  parsedAnalysisType  String
+  writtenAnswer       String
+  observedFacts       String             // JSON array of strings
+  detectedFindings    String             // JSON array of strings
+  inferredConclusions String             // JSON array of strings
+  confidenceLevel     String             // "HIGH" | "MEDIUM" | "LOW"
+  confidenceScore     Float              // 0.0 to 1.0
+  supportingImages    String             // JSON array of image URLs/metadata
+  timelineEvents      String             // JSON array of timeline entries
+  createdAt           DateTime           @default(now())
+
+  target              SatelliteTarget?   @relation(fields: [targetId], references: [id])
+  analysisJob         ChangeAnalysisJob? @relation(fields: [analysisJobId], references: [id])
+}
+
+
+// ==========================================
+// GOVERNMENT INVESTIGATIVE INTELLIGENCE & UNIVERSAL INTEGRATION (STAGE 1)
+// ==========================================
+
+model GovernmentAgency {
+  id            String                  @id @default(uuid())
+  code          String                  @unique
+  name          String
+  country       String
+  jurisdiction  String
+  retentionDays Int                     @default(1825)
+  isActive      Boolean                 @default(true)
+  settingsJson  String?
+  createdAt     DateTime                @default(now())
+
+  officers      GovernmentOfficer[]
+  cases         InvestigationCase[]
+  integrations  AuthorizedIntegration[]
+  auditLogs     GovernmentAuditLog[]
+  platformGrants PlatformOwnerGrant[]
+
+  @@index([country])
+  @@index([isActive])
+}
+
+model GovernmentOfficer {
+  id                    String                  @id @default(uuid())
+  userId                String                  @unique
+  agencyId              String
+  badgeNumber           String
+  rank                  String
+  role                  String
+  clearanceLevel        String                  @default("CONFIDENTIAL")
+  canAuthorizeEmergency Boolean                 @default(false)
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+
+  agency          GovernmentAgency        @relation(fields: [agencyId], references: [id])
+  user            User                    @relation(fields: [userId], references: [id])
+  casesLead       InvestigationCase[]     @relation("LeadInvestigator")
+  caseAssignments CaseOfficerAccess[]
+  evidenceLogged  InvestigationEvidence[]
+  auditLogs       GovernmentAuditLog[]
+
+  @@index([agencyId])
+  @@index([role])
+  @@index([badgeNumber])
+}
+
+model InvestigationCase {
+  id                String                  @id @default(uuid())
+  caseNumber        String                  @unique
+  agencyId          String
+  leadOfficerId     String
+  title             String
+  investigationType String
+  classification    String                  @default("CONFIDENTIAL")
+  status            String                  @default("OPEN")
+  incidentLocation  String?
+  incidentLat       Float?
+  incidentLon       Float?
+  incidentRadiusM   Float?                  @default(500.0)
+  timeRangeStart    DateTime
+  timeRangeEnd      DateTime
+  legalMandateRef   String
+  isEmergency       Boolean                 @default(false)
+  emergencyReason   String?
+  summary           String?
+  retentionExpiry   DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  agency            GovernmentAgency        @relation(fields: [agencyId], references: [id])
+  leadOfficer       GovernmentOfficer       @relation("LeadInvestigator", fields: [leadOfficerId], references: [id])
+  assignedOfficers  CaseOfficerAccess[]
+  evidenceItems     InvestigationEvidence[]
+  reports           InvestigationReport[]
+  auditLogs         GovernmentAuditLog[]
+  platformGrants     PlatformOwnerGrant[]
+
+  @@index([agencyId])
+  @@index([leadOfficerId])
+  @@index([status])
+  @@index([investigationType])
+}
+
+model CaseOfficerAccess {
+  id          String            @id @default(uuid())
+  caseId      String
+  officerId   String
+  accessLevel String            @default("READ_WRITE")
+  grantedAt   DateTime          @default(now())
+  expiresAt   DateTime?
+
+  case        InvestigationCase @relation(fields: [caseId], references: [id])
+  officer     GovernmentOfficer @relation(fields: [officerId], references: [id])
+
+  @@unique([caseId, officerId])
+  @@index([officerId])
+}
+
+model AuthorizedIntegration {
+  id              String            @id @default(uuid())
+  agencyId        String
+  name            String
+  category        String
+  adapterType     String
+  endpointUrl     String
+  authConfigEnc   String
+  status          String            @default("DISABLED")
+  requiresWarrant Boolean           @default(true)
+  jurisdiction    String
+  configMetadata  String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  ownerApprovalSignature  String?
+  createdAt       DateTime          @default(now())
+
+  agency          GovernmentAgency  @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId])
+  @@index([category])
+  @@index([status])
+}
+
+model InvestigationEvidence {
+  id                  String                    @id @default(uuid())
+  caseId              String
+  officerId           String
+  sourceType          String
+  sourceName          String
+  sourceOrganization  String
+  acquisitionMethod   String
+  acquisitionDate     DateTime                  @default(now())
+  originalDate        DateTime?
+  mimeType            String
+  storagePath         String
+  fileSizeBytes       BigInt
+  sha256Hash          String
+  blake3Hash          String?
+  isOriginalPreserved Boolean                   @default(true)
+  metadataJson        String?
+  notes               String?
+  createdAt           DateTime                  @default(now())
+
+  case                InvestigationCase         @relation(fields: [caseId], references: [id])
+  officer             GovernmentOfficer         @relation(fields: [officerId], references: [id])
+  chainOfCustody      EvidenceChainOfCustody[]
+  derivedArtifacts    DerivedArtifact[]
+
+  @@index([caseId])
+  @@index([sourceType])
+  @@index([sha256Hash])
+}
+
+model EvidenceChainOfCustody {
+  id               String                @id @default(uuid())
+  evidenceId       String
+  officerId        String
+  action           String
+  timestamp        DateTime              @default(now())
+  details          String?
+  verificationHash String
+
+  evidence         InvestigationEvidence @relation(fields: [evidenceId], references: [id])
+
+  @@index([evidenceId])
+  @@index([timestamp])
+}
+
+model DerivedArtifact {
+  id                String                @id @default(uuid())
+  parentEvidenceId  String
+  name              String
+  artifactType      String
+  storagePath       String
+  sha256Hash        String
+  transformationLog String
+  createdAt         DateTime              @default(now())
+
+  parentEvidence    InvestigationEvidence @relation(fields: [parentEvidenceId], references: [id])
+
+  @@index([parentEvidenceId])
+}
+
+model InvestigationReport {
+  id                   String             @id @default(uuid())
+  caseId               String
+  generatedByOfficerId String
+  title                String
+  executiveSummary     String
+  observedFacts        String
+  detectedFindings     String
+  inferredConclusions  String
+  uncertainties        String
+  evidenceReferences   String
+  classification       String             @default("CONFIDENTIAL")
+  isSealed             Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+
+  case                 InvestigationCase  @relation(fields: [caseId], references: [id])
+
+  @@index([caseId])
+}
+
+model GovernmentAuditLog {
+  id               String             @id @default(uuid())
+  agencyId         String
+  officerId        String?
+  caseId           String?
+  action           String
+  resourceAccessed String
+  ipAddress        String?
+  userAgent        String?
+  warrantRef       String?
+  detailsJson      String?
+  previousLogHash  String?
+  currentLogHash   String
+  timestamp        DateTime           @default(now())
+
+  agency           GovernmentAgency   @relation(fields: [agencyId], references: [id])
+  officer          GovernmentOfficer? @relation(fields: [officerId], references: [id])
+  case             InvestigationCase? @relation(fields: [caseId], references: [id])
+
+  @@index([agencyId])
+  @@index([caseId])
+  @@index([officerId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+model PlatformOwnerGrant {
+  id                      String            @id @default(uuid())
+  agencyId                String
+  caseId                  String?
+  officerId               String?
+  requestType             String            @default("INVESTIGATIVE_QUERY") // INVESTIGATIVE_QUERY | CONNECTOR_ACTIVATION | CASE_EVIDENCE_ACCESS
+  requestedScopeJson      String            // JSON describing requested categories, geo radius, time bounds
+  justification           String
+  status                  String            @default("PENDING_OWNER_APPROVAL") // PENDING_OWNER_APPROVAL | APPROVED | REJECTED | REVOKED
+  approvedByOwnerId       String?
+  approvedAt              DateTime?
+  approvalSignature       String?
+  decisionReason          String?
+  revokedAt               DateTime?
+  revocationReason        String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  agency                  GovernmentAgency   @relation(fields: [agencyId], references: [id])
+  case                    InvestigationCase? @relation(fields: [caseId], references: [id])
+
+  @@index([agencyId])
+  @@index([caseId])
+  @@index([status])
+  @@index([requestType])
 }

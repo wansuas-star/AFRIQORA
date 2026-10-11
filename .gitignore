@@ -54,3 +54,9 @@ prisma/migrations/migration_lock.toml
 # Logs
 *.log
 npm-debug.log*
+
+# Mobile binaries & keys
+*.apk
+*.aab
+*.jks
+*.keystore

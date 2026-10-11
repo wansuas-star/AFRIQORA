@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { requireAuth } from '../../shared/auth.middleware';
-import { recordView, getPlatformStats } from './monetization.controller';
+import { getMonetizationData, requestWithdrawal } from './monetization.controller';
 
 const router = Router();
 
-router.post('/view', recordView);          // view token already authenticates the viewer
-router.get('/stats', requireAuth, getPlatformStats);
+router.get('/', requireAuth, getMonetizationData);
+router.post('/withdraw', requireAuth, requestWithdrawal);
 
 export default router;

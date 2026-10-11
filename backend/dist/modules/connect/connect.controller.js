@@ -1,65 +1,59 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.disconnectService = exports.connectService = exports.getPermissions = exports.getServices = void 0;
-const client_1 = require("@prisma/client");
-const prisma = new client_1.PrismaClient();
-// Keep parity with legacy CONNECT_PERMISSIONS
-const CONNECT_PERMISSIONS = {
-    google: ['View basic profile info', 'List Google accounts', 'Request offline access (refresh tokens)'],
-    microsoft: ['View basic profile info', 'Sign in with Microsoft accounts', 'Request offline access (refresh tokens)'],
-    'google-drive': ['View and manage Google Drive files (optional)', 'Read metadata and file list'],
-    calendar: ['View and manage calendars', 'Create and edit events'],
-    email: ['Read basic mailbox metadata', 'Send email on your behalf (optional)'],
-    'cloud-storage': ['Upload and download files', 'List buckets and objects'],
-    'business-services': ['Access basic business profile', 'Manage appointments and availability']
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-const getServices = async (req, res) => {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.disconnectService = exports.connectService = exports.getConnectedServices = exports.getPermissions = void 0;
+const prisma_1 = __importDefault(require("../../config/prisma"));
+// Static permissions map (replicated from legacy)
+const CONNECT_PERMISSIONS = {
+    google: ['profile', 'email'],
+    facebook: ['public_profile', 'email'],
+    twitter: ['tweet.read', 'users.read'],
+    instagram: ['user_profile', 'user_media'],
+    tiktok: ['user.info.basic', 'video.list'],
+};
+// GET /api/connect/permissions
+const getPermissions = (_req, res) => {
+    res.json({ permissions: CONNECT_PERMISSIONS });
+};
+exports.getPermissions = getPermissions;
+// GET /api/connect/services?userId=<id>
+const getConnectedServices = async (req, res) => {
     try {
-        const userId = req.query.userId || req.query.uid || 'anonymous';
-        if (userId === 'anonymous') {
-            return res.json({ userId, services: {} });
+        const { userId } = req.query;
+        if (!userId || typeof userId !== 'string') {
+            return res.status(400).json({ error: 'userId query parameter is required' });
         }
-        const connections = await prisma.serviceConnection.findMany({
-            where: { userId: String(userId) }
+        const connections = await prisma_1.default.serviceConnection.findMany({
+            where: { userId },
+            select: { serviceName: true, permissions: true, createdAt: true },
         });
-        const services = {};
-        for (const conn of connections) {
-            services[conn.serviceName] = {
-                connected: true,
-                createdAt: conn.createdAt,
-                meta: { permissions: JSON.parse(conn.permissions || '[]') }
-            };
-        }
-        res.json({ userId, services });
+        res.json({ connections });
     }
     catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-exports.getServices = getServices;
-const getPermissions = (req, res) => {
-    const service = req.query.service;
-    const perms = CONNECT_PERMISSIONS[service] || [];
-    res.json({ service, permissions: perms });
-};
-exports.getPermissions = getPermissions;
+exports.getConnectedServices = getConnectedServices;
+// POST /api/connect
 const connectService = async (req, res) => {
     try {
-        const { service } = req.body;
-        if (!service)
-            return res.status(400).json({ error: 'service required' });
-        const perms = CONNECT_PERMISSIONS[service] || [];
-        await prisma.serviceConnection.upsert({
-            where: { userId_serviceName: { userId: req.userId, serviceName: String(service) } },
-            update: { permissions: JSON.stringify(perms) },
-            create: {
-                userId: req.userId,
-                serviceName: String(service),
-                permissions: JSON.stringify(perms)
-            }
+        const { serviceName, permissions } = req.body;
+        const userId = req.userId;
+        if (!serviceName || !CONNECT_PERMISSIONS[serviceName]) {
+            return res.status(400).json({ error: `Unknown service: ${serviceName}` });
+        }
+        const serializedPermissions = Array.isArray(permissions)
+            ? permissions.join(',')
+            : (permissions ?? CONNECT_PERMISSIONS[serviceName].join(','));
+        const connection = await prisma_1.default.serviceConnection.upsert({
+            where: { userId_serviceName: { userId, serviceName } },
+            update: { permissions: serializedPermissions },
+            create: { userId, serviceName, permissions: serializedPermissions },
         });
-        res.json({ ok: true, service, connected: true, permissions: perms });
+        res.json({ connection });
     }
     catch (error) {
         console.error(error);
@@ -67,15 +61,16 @@ const connectService = async (req, res) => {
     }
 };
 exports.connectService = connectService;
+// DELETE /api/connect/:service
 const disconnectService = async (req, res) => {
     try {
-        const service = req.params.service;
-        if (!service)
-            return res.status(400).json({ error: 'service required' });
-        await prisma.serviceConnection.deleteMany({
-            where: { userId: req.userId, serviceName: String(service) }
+        const rawService = req.params['service'];
+        const serviceParam = Array.isArray(rawService) ? rawService[0] : rawService;
+        const userId = req.userId;
+        await prisma_1.default.serviceConnection.deleteMany({
+            where: { userId, serviceName: serviceParam },
         });
-        res.json({ ok: true, service, connected: false });
+        res.json({ success: true, message: `Disconnected from ${serviceParam}` });
     }
     catch (error) {
         console.error(error);

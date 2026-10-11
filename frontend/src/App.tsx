@@ -1,0 +1,210 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './context/AuthContext';
+import { notificationsApi } from './services/api';
+import { setupStatusBar, registerHardwareBackButton, initPushNotifications } from './services/device';
+import { Header } from './components/Header';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { AuthModal } from './components/AuthModal';
+import { BusinessDirectory } from './components/BusinessDirectory';
+import { CommercialHub } from './components/CommercialHub';
+import { SatelliteIntelligenceHub } from './components/SatelliteIntelligenceHub';
+import { InvestigationWorkspace } from './components/government/InvestigationWorkspace';
+import { UnifiedSearchModal } from './components/UnifiedSearchModal';
+import { NotificationsDrawer } from './components/NotificationsDrawer';
+import { Sparkles, ShieldCheck, Zap } from 'lucide-react';
+
+export const App: React.FC = () => {
+  const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState('satellite');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  // Setup mobile native capabilities & Android hardware back button
+  useEffect(() => {
+    setupStatusBar(true);
+    initPushNotifications();
+
+    const unregister = registerHardwareBackButton(() => {
+      if (isAuthModalOpen) {
+        setIsAuthModalOpen(false);
+        return true;
+      }
+      if (isSearchModalOpen) {
+        setIsSearchModalOpen(false);
+        return true;
+      }
+      if (isNotificationsOpen) {
+        setIsNotificationsOpen(false);
+        return true;
+      }
+      if (activeTab !== 'feed') {
+        setActiveTab('feed');
+        return true;
+      }
+      return false; // Allow app to exit gracefully when at root feed
+    });
+
+    return unregister;
+  }, [isAuthModalOpen, isSearchModalOpen, isNotificationsOpen, activeTab]);
+
+  // Periodically check for unread notifications if logged in
+  useEffect(() => {
+    if (!user) return;
+
+    const checkUnread = async () => {
+      try {
+        const res = await notificationsApi.getNotifications(10);
+        setUnreadNotifications(res.unreadCount || 0);
+      } catch (e) {}
+    };
+
+    checkUnread();
+    const interval = setInterval(checkUnread, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Top Navigation */}
+      <Header
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        openAuthModal={() => setIsAuthModalOpen(true)}
+        openSearchModal={() => setIsSearchModalOpen(true)}
+        openNotifications={() => setIsNotificationsOpen(true)}
+        unreadNotifications={unreadNotifications}
+      />
+
+      {/* Main Content Area */}
+      <main className="main-content-area" style={{ flex: 1 }}>
+        <div className="container">
+          {/* Hero for unauthenticated guests */}
+          {!user && activeTab === 'feed' && (
+            <section style={{
+              padding: '2.5rem 0 2rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '2rem',
+              alignItems: 'center',
+              borderBottom: '1px solid var(--border)',
+              marginBottom: '1rem',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.25rem' }}>
+                  <img
+                    src="/assets/afriqora-logo.png"
+                    alt="AFRIQORA Logo"
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      objectFit: 'contain',
+                      borderRadius: '10px',
+                      background: '#ffffff',
+                      padding: '3px',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+                    }}
+                  />
+                  <span className="badge badge-cyan" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <Sparkles size={13} /> Multi-Sensor Satellite Intelligence Platform
+                  </span>
+                </div>
+                <h1 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 3.2rem)', fontWeight: 800, lineHeight: 1.15, marginBottom: '1rem' }}>
+                  Earth Observation &amp; AI Change Intelligence
+                </h1>
+                <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1.6, marginBottom: '1.5rem', maxWidth: '540px' }}>
+                  Analyze African mining, maritime ports, and infrastructure via Sentinel-1 SAR &amp; Sentinel-2 Optical earth observations with verifiable multi-sensor evidence.
+                </p>
+
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" onClick={() => setActiveTab('satellite')} style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+                    Launch Satellite Intel
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setActiveTab('businesses')} style={{ padding: '0.75rem 1.5rem' }}>
+                    Enterprise Directory
+                  </button>
+                </div>
+              </div>
+
+              {/* Value Props Card */}
+              <div className="glass-panel" style={{ padding: '1.75rem', border: '1px solid var(--border-accent)' }}>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '1.2rem' }}>Platform Principles</h3>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div style={{ padding: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'rgba(56,189,248,0.15)', color: 'var(--accent)', height: 'fit-content' }}>
+                      <Zap size={18} />
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.2rem' }}>Total Self-Management</h4>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Register and manage your own business storefront, pricing, and content.</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div style={{ padding: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'rgba(52,211,153,0.15)', color: 'var(--green)', height: 'fit-content' }}>
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.2rem' }}>Zero Data Selling</h4>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Personal user data is never sold. All analytics use privacy-preserving aggregates.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Active Tab View */}
+          {activeTab === 'satellite' && <SatelliteIntelligenceHub />}
+          {activeTab === 'businesses' && <BusinessDirectory openAuthModal={() => setIsAuthModalOpen(true)} />}
+          {activeTab === 'commercial' && <CommercialHub openAuthModal={() => setIsAuthModalOpen(true)} />}
+          {activeTab === 'investigations' && <InvestigationWorkspace />}
+        </div>
+      </main>
+
+      {/* Desktop Footer (Hidden on Mobile) */}
+      <footer className="desktop-footer" style={{
+        borderTop: '1px solid var(--border)',
+        padding: '2rem 0',
+        marginTop: '3rem',
+        background: 'rgba(7, 13, 24, 0.7)',
+      }}>
+        <div className="container" style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          fontSize: '0.85rem',
+          color: 'var(--text-muted)',
+        }}>
+          <div>© {new Date().getFullYear()} AFRIQORA. All rights reserved. Self-service African business infrastructure.</div>
+          <div style={{ display: 'flex', gap: '1.5rem' }}>
+            <button onClick={() => setActiveTab('feed')} className="btn btn-ghost" style={{ padding: 0 }}>Feed</button>
+            <button onClick={() => setActiveTab('businesses')} className="btn btn-ghost" style={{ padding: 0 }}>Businesses</button>
+            <button onClick={() => setActiveTab('creator')} className="btn btn-ghost" style={{ padding: 0 }}>Creator Hub</button>
+          </div>
+        </div>
+      </footer>
+
+      {/* Mobile Bottom Navigation Bar (Visible on mobile viewports) */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        openAuthModal={() => setIsAuthModalOpen(true)}
+        isLoggedIn={!!user}
+      />
+
+      {/* Global Modals & Drawers */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <UnifiedSearchModal isOpen={isSearchModalOpen} onClose={() => setIsSearchModalOpen(false)} />
+      <NotificationsDrawer
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        onUpdateUnread={setUnreadNotifications}
+      />
+    </div>
+  );
+};
+

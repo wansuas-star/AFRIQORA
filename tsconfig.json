@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": [
+    "prisma.config.ts"
+  ],
+  "exclude": [
+    "backend",
+    "frontend",
+    "node_modules",
+    "android",
+    "ios",
+    "www"
+  ]
+}

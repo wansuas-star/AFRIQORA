@@ -1,10 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const messaging_controller_1 = require("./messaging.controller");
-const auth_middleware_1 = require("../../shared/auth.middleware");
-const router = (0, express_1.Router)();
-router.use(auth_middleware_1.requireAuth);
-router.post('/', messaging_controller_1.sendMessage);
-router.get('/:peerId', messaging_controller_1.getMessages);
-exports.default = router;
+const r = (0, express_1.Router)();
+exports.default = r;

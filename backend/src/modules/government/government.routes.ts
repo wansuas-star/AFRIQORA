@@ -14,6 +14,8 @@ const router = Router();
 router.get('/cases', requireAuth, requireOfficer, GovernmentController.listCases);
 router.post('/cases', requireAuth, requireOfficer, GovernmentController.createCase);
 router.get('/cases/:id', requireAuth, requireOfficer, GovernmentController.getCaseDossier);
+router.get('/cases/:id/evidence/:evidenceId', requireAuth, requireOfficer, GovernmentController.getEvidenceItem);
+router.post('/cases/:id/evidence/:evidenceId/export', requireAuth, requireOfficer, GovernmentController.exportEvidence);
 
 // Automated Multi-Source Ingestion (Officer Clearance Required)
 router.post('/cases/:id/query-sources', requireAuth, requireOfficer, GovernmentController.queryAuthorizedSources);

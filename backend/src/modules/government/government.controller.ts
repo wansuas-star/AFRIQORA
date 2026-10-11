@@ -151,6 +151,105 @@ export class GovernmentController {
         return;
       }
 
+      // --- PLATFORM OWNER MANDATORY SENSITIVE INFORMATION POLICY ---
+      // Sensitive evidence is protected and locked by default.
+      // Gate 1: Judicial Warrant Reference
+      const hasLegalWarrant = Boolean(caseRecord.legalMandateRef && caseRecord.legalMandateRef.trim().length > 0);
+
+      // Gate 2: Explicit Personal Platform Owner Authorization Grant
+      const activeGrant = await prisma.platformOwnerGrant.findFirst({
+        where: {
+          agencyId: caseRecord.agencyId,
+          OR: [
+            { caseId: caseRecord.id },
+            { caseId: null },
+          ],
+          status: 'APPROVED',
+          approvalSignature: { not: null },
+          revokedAt: null,
+        },
+      });
+
+      const isOwnerAuthorized = Boolean(activeGrant);
+      const canAccessSensitiveEvidence = hasLegalWarrant && isOwnerAuthorized;
+
+      let sanitizedEvidence = caseRecord.evidenceItems || [];
+      if (!canAccessSensitiveEvidence) {
+        // Redact and lock sensitive evidence by default
+        sanitizedEvidence = sanitizedEvidence.map((ev: any) => ({
+          id: ev.id,
+          caseId: ev.caseId,
+          sourceType: ev.sourceType,
+          sourceName: ev.sourceName,
+          sourceOrganization: ev.sourceOrganization,
+          acquisitionMethod: ev.acquisitionMethod,
+          acquisitionDate: ev.acquisitionDate,
+          originalDate: ev.originalDate,
+          mimeType: ev.mimeType,
+          fileSizeBytes: ev.fileSizeBytes ? ev.fileSizeBytes.toString() : '0',
+          sha256Hash: ev.sha256Hash,
+          storagePath: !isOwnerAuthorized
+            ? '[RESTRICTED: PENDING PLATFORM OWNER AUTHORIZATION]'
+            : '[RESTRICTED: MISSING JUDICIAL WARRANT]',
+          metadataJson: JSON.stringify({
+            status: 'ACCESS_RESTRICTED',
+            policy: 'Sensitive digital evidence is protected by default. Access strictly requires verified judicial warrant AND personal Platform Owner authorization.',
+            isOwnerAuthorized,
+            hasLegalWarrant,
+          }),
+          isRestrictedByPolicy: true,
+          chainOfCustody: (ev.chainOfCustody || []).map((c: any) => ({
+            id: c.id,
+            evidenceId: c.evidenceId,
+            action: c.action,
+            timestamp: c.timestamp,
+            details: '[RESTRICTED - CUSTODY RECORD REDACTED PENDING OWNER APPROVAL]',
+            verificationHash: c.verificationHash,
+          })),
+          derivedArtifacts: [],
+        }));
+
+        // Log sensitive evidence access restriction to tamper-evident audit ledger
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action: 'ACCESS_DENIED_SENSITIVE_EVIDENCE_LOCKED',
+            resourceAccessed: `Case ${caseRecord.caseNumber} Evidence Vault`,
+            warrantRef: caseRecord.legalMandateRef,
+            currentLogHash: crypto.createHash('sha256').update(caseRecord.id + 'EVIDENCE_LOCKED' + Date.now()).digest('hex'),
+            detailsJson: JSON.stringify({
+              reason: !isOwnerAuthorized ? 'Lacks Platform Owner authorization grant' : 'Missing judicial warrant reference',
+              isOwnerAuthorized,
+              hasLegalWarrant,
+              evidenceItemsCount: (caseRecord.evidenceItems || []).length,
+            }),
+          },
+        });
+      } else {
+        // Log authorized sensitive evidence access
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action: 'SENSITIVE_EVIDENCE_ACCESSED',
+            resourceAccessed: `Case ${caseRecord.caseNumber} Evidence Vault`,
+            warrantRef: caseRecord.legalMandateRef,
+            currentLogHash: crypto.createHash('sha256').update(caseRecord.id + activeGrant!.id + Date.now()).digest('hex'),
+            detailsJson: JSON.stringify({
+              grantId: activeGrant!.id,
+              evidenceItemsCount: (caseRecord.evidenceItems || []).length,
+              authorizedScope: activeGrant!.requestedScopeJson,
+            }),
+          },
+        });
+      }
+
+      caseRecord.evidenceItems = sanitizedEvidence.map((ev: any) => ({
+        ...ev,
+        fileSizeBytes: ev.fileSizeBytes ? ev.fileSizeBytes.toString() : '0',
+      }));
+
       // Build multi-source correlated timeline
       const timeline = (caseRecord.evidenceItems || []).map((ev: any) => {
         let parsedMeta: any = {};
@@ -710,4 +809,211 @@ export class GovernmentController {
     }
   }
 
+  /**
+   * Dual-Gate Protected: Get Individual Sensitive Evidence Item
+   * Strictly verifies judicial warrant (Gate 1) AND explicit Platform Owner grant (Gate 2).
+   */
+  public static async getEvidenceItem(req: Request, res: Response): Promise<void> {
+    try {
+      const { id: caseId, evidenceId } = req.params;
+      const caseRecord = await prisma.investigationCase.findUnique({
+        where: { id: String(caseId) },
+      });
+
+      if (!caseRecord) {
+        res.status(404).json({ ok: false, error: 'Case not found' });
+        return;
+      }
+
+      const evidence = await prisma.investigationEvidence.findFirst({
+        where: { id: String(evidenceId), caseId: String(caseId) },
+        include: { chainOfCustody: true, derivedArtifacts: true },
+      });
+
+      if (!evidence) {
+        res.status(404).json({ ok: false, error: 'Evidence item not found' });
+        return;
+      }
+
+      // Gate 1: Judicial Warrant Verification
+      if (!caseRecord.legalMandateRef || caseRecord.legalMandateRef.trim().length === 0) {
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action: 'ACCESS_DENIED_MISSING_WARRANT',
+            resourceAccessed: `Evidence ${evidence.id}`,
+            currentLogHash: crypto.createHash('sha256').update(evidence.id + 'DENIED_WARRANT').digest('hex'),
+            detailsJson: JSON.stringify({ reason: 'Legal judicial warrant reference required for sensitive evidence access' }),
+          },
+        });
+        res.status(403).json({
+          ok: false,
+          error: 'Access Denied: Valid judicial warrant or legal mandate is strictly required to access sensitive evidence.',
+        });
+        return;
+      }
+
+      // Gate 2: Explicit Platform Owner Authorization
+      const activeGrant = await prisma.platformOwnerGrant.findFirst({
+        where: {
+          agencyId: caseRecord.agencyId,
+          OR: [
+            { caseId: caseRecord.id },
+            { caseId: null },
+          ],
+          status: 'APPROVED',
+          approvalSignature: { not: null },
+          revokedAt: null,
+        },
+      });
+
+      if (!activeGrant) {
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action: 'ACCESS_DENIED_NO_OWNER_GRANT',
+            resourceAccessed: `Evidence ${evidence.id}`,
+            warrantRef: caseRecord.legalMandateRef,
+            currentLogHash: crypto.createHash('sha256').update(evidence.id + 'DENIED_OWNER').digest('hex'),
+            detailsJson: JSON.stringify({ reason: 'Sensitive evidence access strictly requires explicit authorization from the Platform Owner.' }),
+          },
+        });
+        res.status(403).json({
+          ok: false,
+          error: 'Access Denied: Sensitive evidence access strictly requires explicit authorization from the Platform Owner.',
+        });
+        return;
+      }
+
+      // Audit logged access
+      await prisma.governmentAuditLog.create({
+        data: {
+          agencyId: caseRecord.agencyId,
+          caseId: caseRecord.id,
+          action: 'SENSITIVE_EVIDENCE_ACCESSED',
+          resourceAccessed: `Evidence ${evidence.id}`,
+          warrantRef: caseRecord.legalMandateRef,
+          currentLogHash: crypto.createHash('sha256').update(evidence.id + activeGrant.id + Date.now()).digest('hex'),
+          detailsJson: JSON.stringify({
+            grantId: activeGrant.id,
+            sourceType: evidence.sourceType,
+            sourceName: evidence.sourceName,
+          }),
+        },
+      });
+
+      const safeEvidence = { ...evidence, fileSizeBytes: evidence.fileSizeBytes ? evidence.fileSizeBytes.toString() : '0' };
+      res.json({ ok: true, evidence: safeEvidence });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /**
+   * Dual-Gate Protected: Export Sensitive Evidence
+   * Strictly verifies judicial warrant (Gate 1) AND explicit Platform Owner export approval (Gate 2).
+   */
+  public static async exportEvidence(req: Request, res: Response): Promise<void> {
+    try {
+      const { id: caseId, evidenceId } = req.params;
+      const caseRecord = await prisma.investigationCase.findUnique({
+        where: { id: String(caseId) },
+      });
+
+      if (!caseRecord) {
+        res.status(404).json({ ok: false, error: 'Case not found' });
+        return;
+      }
+
+      const evidence = await prisma.investigationEvidence.findFirst({
+        where: { id: String(evidenceId), caseId: String(caseId) },
+      });
+
+      if (!evidence) {
+        res.status(404).json({ ok: false, error: 'Evidence item not found' });
+        return;
+      }
+
+      // Gate 1: Judicial Warrant Verification
+      if (!caseRecord.legalMandateRef || caseRecord.legalMandateRef.trim().length === 0) {
+        res.status(403).json({ ok: false, error: 'Export Denied: Missing judicial warrant.' });
+        return;
+      }
+
+      // Gate 2: Explicit Platform Owner Grant
+      const activeGrant = await prisma.platformOwnerGrant.findFirst({
+        where: {
+          agencyId: caseRecord.agencyId,
+          OR: [
+            { caseId: caseRecord.id },
+            { caseId: null },
+          ],
+          status: 'APPROVED',
+          approvalSignature: { not: null },
+          revokedAt: null,
+        },
+      });
+
+      if (!activeGrant) {
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action: 'EVIDENCE_EXPORT_DENIED',
+            resourceAccessed: `Evidence ${evidence.id}`,
+            warrantRef: caseRecord.legalMandateRef,
+            currentLogHash: crypto.createHash('sha256').update(evidence.id + 'EXPORT_DENIED').digest('hex'),
+            detailsJson: JSON.stringify({ reason: 'Lacks Platform Owner export grant' }),
+          },
+        });
+        res.status(403).json({
+          ok: false,
+          error: 'Export Denied: Evidence export strictly requires explicit Platform Owner authorization.',
+        });
+        return;
+      }
+
+      let canExport = true;
+      if (activeGrant.requestedScopeJson) {
+        try {
+          const parsed = JSON.parse(activeGrant.requestedScopeJson);
+          if (parsed.allowExport === false) canExport = false;
+        } catch (e) {}
+      }
+
+      if (!canExport) {
+        res.status(403).json({ ok: false, error: 'Export Denied: Owner grant scope restricts data export.' });
+        return;
+      }
+
+      // Audit authorized export
+      await prisma.governmentAuditLog.create({
+        data: {
+          agencyId: caseRecord.agencyId,
+          caseId: caseRecord.id,
+          action: 'EVIDENCE_EXPORT_AUTHORIZED',
+          resourceAccessed: `Evidence ${evidence.id}`,
+          warrantRef: caseRecord.legalMandateRef,
+          currentLogHash: crypto.createHash('sha256').update(evidence.id + 'EXPORTED' + Date.now()).digest('hex'),
+          detailsJson: JSON.stringify({ grantId: activeGrant.id, exportedAt: new Date().toISOString() }),
+        },
+      });
+
+      res.json({
+        ok: true,
+        exportPackage: {
+          evidenceId: evidence.id,
+          sourceType: evidence.sourceType,
+          sourceName: evidence.sourceName,
+          sha256Hash: evidence.sha256Hash,
+          exportSignature: crypto.createHash('sha256').update(evidence.sha256Hash + activeGrant.approvalSignature).digest('hex'),
+          exportedAt: new Date().toISOString(),
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  }
 }

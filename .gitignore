@@ -60,3 +60,8 @@ npm-debug.log*
 *.aab
 *.jks
 *.keystore
+
+# Production Database Backups
+backups/
+backend/backups/
+*.sqlite.meta.json

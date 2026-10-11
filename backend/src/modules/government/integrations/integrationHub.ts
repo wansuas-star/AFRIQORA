@@ -117,28 +117,9 @@ export class IntegrationHub {
       throw new Error('Unauthorized: Connector does not belong to the investigating agency');
     }
 
-    // 4. Warrant Enforcement
-    if (integration.requiresWarrant && !scope.legalMandateRef && !scope.isEmergency) {
-      await this.logAudit({
-        agencyId: integration.agencyId,
-        officerId: scope.officerId,
-        caseId: scope.caseId,
-        action: 'ACCESS_DENIED_MISSING_WARRANT',
-        resourceAccessed: integration.name,
-        ipAddress,
-        userAgent,
-        details: { reason: 'Data source requires explicit warrant or emergency authorization' },
-      });
-
-      return {
-        adapterId: integration.id,
-        category: integration.category as any,
-        status: 'ACCESS_DENIED',
-        assets: [],
-        epistemicTier: 'UNAVAILABLE_INFORMATION',
-        message: 'Access Denied: This data source requires a verified legal mandate or court warrant.',
-      };
-    }
+    // 4. Internal Release Governance
+    // Platform Owner approval is the sole internal authorization authority.
+    // If legal reference is provided, it is recorded in the audit trail without acting as a separate internal blocking gate.
 
     // 4.1 Mandatory Platform Owner Approval Policy (Gate 2)
     // Enforces: Government status or court warrant alone is NOT authorization.

@@ -98,10 +98,10 @@ export class GovernmentController {
         summary,
       } = req.body;
 
-      if (!agencyId || !leadOfficerId || !title || !investigationType || !legalMandateRef) {
+      if (!agencyId || !leadOfficerId || !title || !investigationType) {
         res.status(400).json({
           ok: false,
-          error: 'Missing mandatory case parameters (agencyId, leadOfficerId, title, investigationType, legalMandateRef)',
+          error: 'Missing mandatory case parameters (agencyId, leadOfficerId, title, investigationType)',
         });
         return;
       }
@@ -123,7 +123,7 @@ export class GovernmentController {
           incidentRadiusM: incidentRadiusM ? Number(incidentRadiusM) : 500.0,
           timeRangeStart: new Date(timeRangeStart || Date.now() - 7 * 86400000),
           timeRangeEnd: new Date(timeRangeEnd || Date.now()),
-          legalMandateRef,
+          legalMandateRef: legalMandateRef || null,
           isEmergency: Boolean(isEmergency),
           emergencyReason,
           summary,
@@ -181,11 +181,8 @@ export class GovernmentController {
       }
 
       // --- PLATFORM OWNER MANDATORY SENSITIVE INFORMATION POLICY ---
-      // Sensitive evidence is protected and locked by default.
-      // Gate 1: Judicial Warrant Reference
-      const hasLegalWarrant = Boolean(caseRecord.legalMandateRef && caseRecord.legalMandateRef.trim().length > 0);
-
-      // Gate 2: Explicit Personal Platform Owner Authorization Grant
+      // Platform Owner approval is the sole internal release authority for sensitive information.
+      // Sensitive evidence is locked by default and accessible only with explicit Platform Owner grant.
       const activeGrant = await prisma.platformOwnerGrant.findFirst({
         where: {
           agencyId: caseRecord.agencyId,
@@ -201,7 +198,8 @@ export class GovernmentController {
 
       const grantValidity = checkGrantValidity(activeGrant);
       const isOwnerAuthorized = grantValidity.isValid;
-      const canAccessSensitiveEvidence = hasLegalWarrant && isOwnerAuthorized;
+      // Internal software release gate is governed solely by Platform Owner authorization
+      const canAccessSensitiveEvidence = isOwnerAuthorized;
 
       if (activeGrant && !grantValidity.isValid && grantValidity.reason === 'EXPIRED') {
         await prisma.governmentAuditLog.create({
@@ -232,14 +230,11 @@ export class GovernmentController {
           mimeType: ev.mimeType,
           fileSizeBytes: ev.fileSizeBytes ? ev.fileSizeBytes.toString() : '0',
           sha256Hash: ev.sha256Hash,
-          storagePath: !isOwnerAuthorized
-            ? '[RESTRICTED: PENDING PLATFORM OWNER AUTHORIZATION]'
-            : '[RESTRICTED: MISSING JUDICIAL WARRANT]',
+          storagePath: '[RESTRICTED: PENDING PLATFORM OWNER AUTHORIZATION]',
           metadataJson: JSON.stringify({
             status: 'ACCESS_RESTRICTED',
-            policy: 'Sensitive digital evidence is protected by default. Access strictly requires verified judicial warrant AND personal Platform Owner authorization.',
+            policy: 'Sensitive digital evidence is protected by default. Release strictly requires explicit Platform Owner authorization. Note: Internal owner approval does not replace independent legal obligations.',
             isOwnerAuthorized,
-            hasLegalWarrant,
           }),
           isRestrictedByPolicy: true,
           chainOfCustody: (ev.chainOfCustody || []).map((c: any) => ({
@@ -263,9 +258,8 @@ export class GovernmentController {
             warrantRef: caseRecord.legalMandateRef,
             currentLogHash: crypto.createHash('sha256').update(caseRecord.id + 'EVIDENCE_LOCKED' + Date.now()).digest('hex'),
             detailsJson: JSON.stringify({
-              reason: !isOwnerAuthorized ? 'Lacks Platform Owner authorization grant' : 'Missing judicial warrant reference',
+              reason: 'Lacks explicit Platform Owner authorization grant',
               isOwnerAuthorized,
-              hasLegalWarrant,
               evidenceItemsCount: (caseRecord.evidenceItems || []).length,
             }),
           },
@@ -897,25 +891,7 @@ export class GovernmentController {
         return;
       }
 
-      // Gate 1: Judicial Warrant Verification
-      if (!caseRecord.legalMandateRef || caseRecord.legalMandateRef.trim().length === 0) {
-        await prisma.governmentAuditLog.create({
-          data: {
-            agencyId: caseRecord.agencyId,
-            caseId: caseRecord.id,
-            action: 'ACCESS_DENIED_MISSING_WARRANT',
-            resourceAccessed: `Evidence ${evidence.id}`,
-            currentLogHash: crypto.createHash('sha256').update(evidence.id + 'DENIED_WARRANT').digest('hex'),
-            detailsJson: JSON.stringify({ reason: 'Legal judicial warrant reference required for sensitive evidence access' }),
-          },
-        });
-        res.status(403).json({
-          ok: false,
-          error: 'Access Denied: Valid judicial warrant or legal mandate is strictly required to access sensitive evidence.',
-        });
-        return;
-      }
-
+      // Platform Owner Authorization (Sole Internal Release Authority)
       // Gate 2: Explicit Platform Owner Authorization
       const activeGrant = await prisma.platformOwnerGrant.findFirst({
         where: {
@@ -1021,12 +997,7 @@ export class GovernmentController {
         return;
       }
 
-      // Gate 1: Judicial Warrant Verification
-      if (!caseRecord.legalMandateRef || caseRecord.legalMandateRef.trim().length === 0) {
-        res.status(403).json({ ok: false, error: 'Export Denied: Missing judicial warrant.' });
-        return;
-      }
-
+      // Platform Owner Authorization (Sole Internal Release Authority)
       // Gate 2: Explicit Platform Owner Grant
       const activeGrant = await prisma.platformOwnerGrant.findFirst({
         where: {

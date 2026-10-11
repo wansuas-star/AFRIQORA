@@ -156,25 +156,24 @@ export class IntegrationHub {
       },
     });
 
-    if (!activeGrant) {
-      const priorGrant = await prisma.platformOwnerGrant.findFirst({
-        where: {
-          agencyId: scope.agencyId,
-          OR: [
-            { caseId: scope.caseId },
-            { caseId: null },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+    // Check if grant is expired or revoked
+    let isGrantExpired = false;
+    if (activeGrant && activeGrant.requestedScopeJson) {
+      try {
+        const sc = JSON.parse(activeGrant.requestedScopeJson);
+        if (sc.expiresAt && new Date(sc.expiresAt).getTime() <= Date.now()) {
+          isGrantExpired = true;
+        } else if (sc.durationHours && activeGrant.approvedAt && (new Date(activeGrant.approvedAt).getTime() + sc.durationHours * 3600000 <= Date.now())) {
+          isGrantExpired = true;
+        }
+      } catch (e) {}
+    }
 
-      const denialReason = priorGrant
-        ? (priorGrant.status === 'REVOKED'
-            ? 'Platform Owner access grant was REVOKED'
-            : `Platform access request is currently ${priorGrant.status}`)
-        : 'No Platform Owner access approval exists for this agency or case';
-
-      const action = priorGrant?.status === 'REVOKED' ? 'ACCESS_DENIED_REVOKED_OWNER_GRANT' : 'ACCESS_DENIED_PENDING_OWNER_APPROVAL';
+    if (!activeGrant || isGrantExpired) {
+      const denialReason = isGrantExpired
+        ? 'Platform Owner access grant has EXPIRED'
+        : (activeGrant ? 'Platform access request is invalid' : 'No Platform Owner access approval exists for this agency or case');
+      const action = isGrantExpired ? 'ACCESS_DENIED_EXPIRED_OWNER_GRANT' : 'ACCESS_DENIED_PENDING_OWNER_APPROVAL';
 
       await this.logAudit({
         agencyId: integration.agencyId,
@@ -185,7 +184,7 @@ export class IntegrationHub {
         warrantRef: scope.legalMandateRef,
         ipAddress,
         userAgent,
-        details: { reason: denialReason, grantStatus: priorGrant?.status || 'NO_REQUEST_FOUND' },
+        details: { reason: denialReason, grantId: activeGrant?.id },
       });
 
       return {
@@ -194,7 +193,7 @@ export class IntegrationHub {
         status: 'ACCESS_DENIED',
         assets: [],
         epistemicTier: 'UNAVAILABLE_INFORMATION',
-        message: `AFRIQORA Platform Access Denied: Government status or legal warrant alone does not grant platform access. Explicit approval from the Platform Owner is strictly required (${denialReason}).`,
+        message: `AFRIQORA Platform Access Denied: ${denialReason}. Explicit, unexpired Platform Owner authorization is strictly required.`,
       };
     }
 

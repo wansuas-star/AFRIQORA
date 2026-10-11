@@ -1,3 +1,32 @@
+
+/**
+ * Strict Platform Owner Grant Validity & Expiration Checker
+ * Enforces: Approval status, cryptographic signature integrity, non-revocation, and temporal expiration.
+ */
+export function checkGrantValidity(grant: any): { isValid: boolean; reason: string } {
+  if (!grant) return { isValid: false, reason: 'NO_GRANT' };
+  if (grant.status !== 'APPROVED') return { isValid: false, reason: 'NOT_APPROVED' };
+  if (!grant.approvalSignature || grant.approvalSignature.length < 32) return { isValid: false, reason: 'INVALID_SIGNATURE' };
+  if (grant.revokedAt) return { isValid: false, reason: 'REVOKED' };
+
+  if (grant.requestedScopeJson) {
+    try {
+      const scope = JSON.parse(grant.requestedScopeJson);
+      if (scope.expiresAt && new Date(scope.expiresAt).getTime() <= Date.now()) {
+        return { isValid: false, reason: 'EXPIRED' };
+      }
+      if (scope.durationHours && grant.approvedAt) {
+        const expiry = new Date(grant.approvedAt).getTime() + Number(scope.durationHours) * 3600000;
+        if (expiry <= Date.now()) {
+          return { isValid: false, reason: 'EXPIRED' };
+        }
+      }
+    } catch (e) {}
+  }
+
+  return { isValid: true, reason: 'VALID' };
+}
+
 /**
  * AFRIQORA Government Investigative Intelligence Controller
  * Case Dossier Management, Evidence Provenance, Human Review & Audit Ledgers
@@ -170,8 +199,23 @@ export class GovernmentController {
         },
       });
 
-      const isOwnerAuthorized = Boolean(activeGrant);
+      const grantValidity = checkGrantValidity(activeGrant);
+      const isOwnerAuthorized = grantValidity.isValid;
       const canAccessSensitiveEvidence = hasLegalWarrant && isOwnerAuthorized;
+
+      if (activeGrant && !grantValidity.isValid && grantValidity.reason === 'EXPIRED') {
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action: 'ACCESS_DENIED_EXPIRED_OWNER_GRANT',
+            resourceAccessed: `Case ${caseRecord.caseNumber} Evidence Vault`,
+            warrantRef: caseRecord.legalMandateRef,
+            currentLogHash: crypto.createHash('sha256').update(caseRecord.id + 'EXPIRED_GRANT' + Date.now()).digest('hex'),
+            detailsJson: JSON.stringify({ reason: 'Platform Owner authorization grant has expired', grantId: activeGrant.id }),
+          },
+        });
+      }
 
       let sanitizedEvidence = caseRecord.evidenceItems || [];
       if (!canAccessSensitiveEvidence) {
@@ -674,7 +718,7 @@ export class GovernmentController {
     try {
       const id = String(req.params.id);
       const ownerId = (req as any).userId;
-      const { decisionReason, approvedScopeJson } = req.body;
+      const { decisionReason, approvedScopeJson, durationHours, expiresAt } = req.body;
 
       const request = await prisma.platformOwnerGrant.findUnique({ where: { id } });
       if (!request) {
@@ -697,7 +741,25 @@ export class GovernmentController {
           approvedAt: now,
           approvalSignature,
           decisionReason: decisionReason || 'Authorized by Platform Owner',
-          requestedScopeJson: approvedScopeJson ? (typeof approvedScopeJson === 'string' ? approvedScopeJson : JSON.stringify(approvedScopeJson)) : request.requestedScopeJson,
+          requestedScopeJson: (() => {
+            let baseScope: any = {};
+            try {
+              baseScope = request.requestedScopeJson ? JSON.parse(request.requestedScopeJson) : {};
+            } catch (e) {}
+            if (approvedScopeJson) {
+              try {
+                const addScope = typeof approvedScopeJson === 'string' ? JSON.parse(approvedScopeJson) : approvedScopeJson;
+                baseScope = { ...baseScope, ...addScope };
+              } catch (e) {}
+            }
+            if (durationHours) {
+              baseScope.durationHours = Number(durationHours);
+              baseScope.expiresAt = new Date(now.getTime() + Number(durationHours) * 3600000).toISOString();
+            } else if (expiresAt) {
+              baseScope.expiresAt = new Date(expiresAt).toISOString();
+            }
+            return JSON.stringify(baseScope);
+          })(),
         },
       });
 
@@ -887,6 +949,29 @@ export class GovernmentController {
         return;
       }
 
+      const grantValidity = checkGrantValidity(activeGrant);
+      if (!grantValidity.isValid) {
+        const action = grantValidity.reason === 'EXPIRED' ? 'ACCESS_DENIED_EXPIRED_OWNER_GRANT' : 'ACCESS_DENIED_REVOKED_OWNER_GRANT';
+        const errorMsg = grantValidity.reason === 'EXPIRED'
+          ? 'Access Denied: Platform Owner authorization grant has expired. Re-authorization is strictly required.'
+          : 'Access Denied: Platform Owner authorization has been revoked.';
+
+        await prisma.governmentAuditLog.create({
+          data: {
+            agencyId: caseRecord.agencyId,
+            caseId: caseRecord.id,
+            action,
+            resourceAccessed: `Evidence ${evidence.id}`,
+            warrantRef: caseRecord.legalMandateRef,
+            currentLogHash: crypto.createHash('sha256').update(evidence.id + action + Date.now()).digest('hex'),
+            detailsJson: JSON.stringify({ reason: errorMsg, grantId: activeGrant.id }),
+          },
+        });
+
+        res.status(403).json({ ok: false, error: errorMsg });
+        return;
+      }
+
       // Audit logged access
       await prisma.governmentAuditLog.create({
         data: {
@@ -971,6 +1056,15 @@ export class GovernmentController {
         res.status(403).json({
           ok: false,
           error: 'Export Denied: Evidence export strictly requires explicit Platform Owner authorization.',
+        });
+        return;
+      }
+
+      const grantValidity = checkGrantValidity(activeGrant);
+      if (!grantValidity.isValid) {
+        res.status(403).json({
+          ok: false,
+          error: `Export Denied: Platform Owner grant is ${grantValidity.reason.toLowerCase()}.`,
         });
         return;
       }

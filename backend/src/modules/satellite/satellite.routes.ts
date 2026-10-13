@@ -4,7 +4,8 @@ import { SatelliteController } from './satellite.controller';
 const router = Router();
 
 router.get('/auth/status', SatelliteController.getAuthStatus);
-router.get('/status', SatelliteController.getAuthStatus);
+router.get('/status', SatelliteController.getStatus);
+router.get('/alerts', SatelliteController.getAlerts);
 router.get('/geocode', SatelliteController.geocodeLocation);
 router.post('/query', SatelliteController.queryIntelligence);
 router.get('/objects', SatelliteController.getDetectedObjects);

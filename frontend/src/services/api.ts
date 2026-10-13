@@ -72,22 +72,22 @@ export const authApi = {
 // 2. Enterprise & Business Profile API
 export const creatorApi = {
   upsertBusinessProfile: (profile: Partial<BusinessProfile>) =>
-    request<{ businessProfile: BusinessProfile }>('/creator/business-profile', {
+    request<{ businessProfile: BusinessProfile }>('/commercial/business-profile', {
       method: 'POST',
       body: JSON.stringify(profile),
     }),
 
   saveBusinessProfile: (profile: Partial<BusinessProfile>) =>
-    request<{ businessProfile: BusinessProfile }>('/creator/business-profile', {
+    request<{ businessProfile: BusinessProfile }>('/commercial/business-profile', {
       method: 'POST',
       body: JSON.stringify(profile),
     }),
 
   getBusinessProfile: (id: string) =>
-    request<{ user: User; businessProfile: BusinessProfile | null }>('/creator/' + encodeURIComponent(id)),
+    request<{ user: User; businessProfile: BusinessProfile | null }>('/commercial/business/' + encodeURIComponent(id)),
 
-  requestPayout: (amount: number, method: string, details: string) =>
-    request<{ withdrawal: Withdrawal; message: string }>('/creator/withdraw', {
+  requestPayout: (amount: number, method: string, details?: string) =>
+    request<{ withdrawal: Withdrawal; message: string }>('/monetization/withdraw', {
       method: 'POST',
       body: JSON.stringify({ amount, method, details }),
     }),
@@ -97,16 +97,22 @@ export const businessApi = creatorApi;
 
 // 3. Operational Notifications API
 export const notificationsApi = {
-  getNotifications: (limit: number = 20) =>
-    request<{ items: Notification[]; unreadCount: number }>('/notifications?limit=' + limit),
+  getNotifications: (limit: number = 20, type?: string) =>
+    request<{ ok: boolean; items: Notification[]; unreadCount: number }>('/notifications?limit=' + limit + (type ? '&type=' + encodeURIComponent(type) : '')),
+
+  getUnreadCount: () =>
+    request<{ ok: boolean; unreadCount: number }>('/notifications/unread-count'),
+
+  getSatelliteNotifications: () =>
+    request<{ ok: boolean; items: Notification[]; unreadCount: number }>('/notifications/satellite'),
 
   markAsRead: (id: string) =>
-    request<{ success: boolean }>('/notifications/' + encodeURIComponent(id) + '/read', {
+    request<{ ok: boolean; id: string; read: boolean }>('/notifications/' + encodeURIComponent(id) + '/read', {
       method: 'POST',
     }),
 
   markAllRead: () =>
-    request<{ success: boolean }>('/notifications/read-all', {
+    request<{ ok: boolean }>('/notifications/read-all', {
       method: 'POST',
     }),
 };
@@ -116,7 +122,7 @@ export const usersApi = {
   getProfile: () => request<{ user: User }>('/users/profile'),
 
   updateProfile: (profileData: Partial<User>) =>
-    request<{ user: User }>('/users/profile', {
+    request<{ ok: boolean; user: User }>('/users/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     }),
@@ -125,12 +131,12 @@ export const usersApi = {
 // 5. Unified Search API
 export const searchApi = {
   search: (q: string, type: string = 'all', limit: number = 20) =>
-    request<{ count: number; items: SearchItem[] }>('/search?q=' + encodeURIComponent(q) + '&type=' + encodeURIComponent(type) + '&limit=' + limit),
+    request<{ ok: boolean; count: number; items: SearchItem[] }>('/search?q=' + encodeURIComponent(q) + '&type=' + encodeURIComponent(type) + '&limit=' + limit),
 };
 
 // 6. Commercial Self-Service Infrastructure API
 export const commercialApi = {
-  createCampaign: (campaign: { title: string; objective: string; placement: string; budgetTotal: number; dailyBudget: number; startDate: string; endDate?: string }) =>
+  createCampaign: (campaign: any) =>
     request<{ success: boolean; campaign: AdCampaign; message: string }>('/commercial/campaigns', {
       method: 'POST',
       body: JSON.stringify(campaign),
@@ -140,16 +146,16 @@ export const commercialApi = {
     request<{ success: boolean; campaigns: AdCampaign[] }>('/commercial/campaigns'),
 
   createDeposit: (amount: number, currency: string, paymentMethod: string) =>
-    request<{ success: boolean; transaction: MerchantTransaction; message: string }>('/commercial/billing/deposit', {
+    request<{ success: boolean; transaction: MerchantTransaction; message: string }>('/commercial/billing/fund', {
       method: 'POST',
       body: JSON.stringify({ amount, currency, paymentMethod }),
     }),
 
   getBillingSummary: () =>
-    request<{ success: boolean; summary: any }>('/commercial/billing/summary'),
+    request<{ success: boolean; history: any[] }>('/commercial/billing/history'),
 
-  submitVerification: (data: { businessName: string; registrationNumber?: string; taxId?: string; documentsUrl?: string }) =>
-    request<{ success: boolean; message: string }>('/commercial/verification', {
+  submitVerification: (data: { registrationNumber?: string; taxId?: string; documentUrl?: string; documentsUrl?: string; businessName?: string }) =>
+    request<{ success: boolean; message: string; verification: any }>('/commercial/verification', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -158,17 +164,52 @@ export const commercialApi = {
 // 7. Administrative Moderation API
 export const adminApi = {
   getPendingModeration: () =>
-    request<{ success: boolean; campaigns: AdCampaign[]; verifications: BusinessProfile[] }>('/admin/moderation/pending'),
+    request<{ pendingCampaigns: AdCampaign[]; pendingVerifications: any[] }>('/admin/moderation/pending'),
 
   moderateCampaign: (id: string, action: 'approve' | 'reject', notes?: string) =>
     request<{ success: boolean; message: string }>('/admin/moderation/campaign/' + encodeURIComponent(id), {
       method: 'POST',
-      body: JSON.stringify({ action, notes }),
+      body: JSON.stringify({ action, reason: notes }),
     }),
 
   moderateVerification: (id: string, action: 'approve' | 'reject', notes?: string) =>
     request<{ success: boolean; message: string }>('/admin/moderation/verification/' + encodeURIComponent(id), {
       method: 'POST',
-      body: JSON.stringify({ action, notes }),
+      body: JSON.stringify({ action, adminNotes: notes }),
     }),
+};
+
+// 8. Flagship Satellite Earth Observation Intelligence API
+export const satelliteApi = {
+  getStatus: () =>
+    request<{ ok: boolean; status: string; platform: string; pipelines: any; cdse: any; metrics: any }>('/satellite/status'),
+
+  getAuthStatus: () =>
+    request<{ ok: boolean; cdse: any }>('/satellite/auth/status'),
+
+  getAlerts: (limit: number = 10) =>
+    request<{ ok: boolean; count: number; alerts: any[] }>('/satellite/alerts?limit=' + limit),
+
+  geocodeLocation: (q: string) =>
+    request<{ ok: boolean; results: any[] }>('/satellite/geocode?q=' + encodeURIComponent(q)),
+
+  queryIntelligence: (queryPayload: any) =>
+    request<any>('/satellite/query', {
+      method: 'POST',
+      body: JSON.stringify(queryPayload),
+    }),
+
+  getDetectedObjects: (bbox?: string) =>
+    request<any>('/satellite/objects' + (bbox ? '?bbox=' + encodeURIComponent(bbox) : '')),
+
+  getTimeSeries: (params?: { bbox?: string; startDate?: string; endDate?: string; window?: string }) => {
+    const q = new URLSearchParams(params as any).toString();
+    return request<any>('/satellite/timeseries' + (q ? '?' + q : ''));
+  },
+
+  getReports: (targetId?: string, limit: number = 20) =>
+    request<{ ok: boolean; reports: any[] }>('/satellite/reports?limit=' + limit + (targetId ? '&targetId=' + encodeURIComponent(targetId) : '')),
+
+  getTargets: () =>
+    request<{ ok: boolean; targets: any[] }>('/satellite/targets'),
 };

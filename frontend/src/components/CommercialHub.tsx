@@ -212,7 +212,7 @@ export const CommercialHub: React.FC<{ openAuthModal: () => void }> = ({ openAut
           <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.5rem' }}>
             {analytics?.metrics?.totalImpressions || 0}
           </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Delivered in feed & search</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Delivered in verified enterprise directory & search</span>
         </div>
 
         <div className="glass-panel" style={{ padding: '1.25rem' }}>

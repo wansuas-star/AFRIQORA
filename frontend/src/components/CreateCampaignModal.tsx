@@ -17,7 +17,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({ isOpen
   const [totalBudget, setTotalBudget] = useState('50.00');
   const [headline, setHeadline] = useState('');
   const [description, setDescription] = useState('');
-  const [ctaText, setCtaText] = useState('Visit Store');
+  const [ctaText, setCtaText] = useState('Learn More');
   const [ctaUrl, setCtaUrl] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -133,7 +133,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({ isOpen
                 className="form-input"
               >
                 <option value="all">All Channels</option>
-                <option value="feed">Feed Only</option>
+                <option value="spotlight">Enterprise Spotlight</option>
                 <option value="search">Search Only</option>
                 <option value="directory">Directory</option>
               </select>

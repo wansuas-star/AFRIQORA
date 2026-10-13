@@ -87,7 +87,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
             {isRegister
               ? 'Create your free account to access African commerce & services'
-              : 'Sign in to access your business dashboard and feed'}
+              : 'Sign in to access satellite intelligence, space technologies, and business workspace'}
           </p>
         </div>
 

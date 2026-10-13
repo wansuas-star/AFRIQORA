@@ -37,14 +37,27 @@ export const getMerchantBusiness = async (req: AuthenticatedRequest, res: Respon
 export const submitVerification = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { registrationNumber, taxId, documentUrl } = req.body;
+    const { registrationNumber, taxId, documentUrl, documentsUrl, businessName, category, location, country } = req.body;
+    const finalDocUrl = documentUrl || documentsUrl || null;
 
-    const business = await prisma.businessProfile.findFirst({
+    let business = await prisma.businessProfile.findFirst({
       where: { ownerId: userId },
     });
 
     if (!business) {
-      return res.status(404).json({ error: 'Business profile required before applying for verification' });
+      if (!businessName) {
+        return res.status(404).json({ error: 'Business profile required before applying for verification' });
+      }
+      business = await prisma.businessProfile.create({
+        data: {
+          ownerId: userId,
+          businessName,
+          category: category || 'Technology',
+          location: location || null,
+          country: country || 'KE',
+          verificationStatus: 'pending',
+        },
+      });
     }
 
     const verification = await prisma.businessVerification.upsert({
@@ -52,7 +65,7 @@ export const submitVerification = async (req: AuthenticatedRequest, res: Respons
       update: {
         registrationNumber: registrationNumber || null,
         taxId: taxId || null,
-        documentUrl: documentUrl || null,
+        documentUrl: finalDocUrl,
         status: 'pending',
         reviewedAt: null,
         adminNotes: null,
@@ -61,7 +74,7 @@ export const submitVerification = async (req: AuthenticatedRequest, res: Respons
         businessId: business.id,
         registrationNumber: registrationNumber || null,
         taxId: taxId || null,
-        documentUrl: documentUrl || null,
+        documentUrl: finalDocUrl,
         status: 'pending',
       },
     });
@@ -71,9 +84,9 @@ export const submitVerification = async (req: AuthenticatedRequest, res: Respons
       data: { verificationStatus: 'pending' },
     });
 
-    res.json({ success: true, verification });
+    res.json({ success: true, verification, message: 'Verification request submitted successfully' });
   } catch (error) {
-    console.error(error);
+    console.error('Submit verification error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

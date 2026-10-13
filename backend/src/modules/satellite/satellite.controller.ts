@@ -100,6 +100,93 @@ export class SatelliteController {
   private static stac = new STACProvider();
   private static commercial = new CommercialSatelliteProvider();
 
+  public static async getStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const cdse = SatelliteController.copernicus.getAuthStatus();
+      const targetCount = await prisma.satelliteTarget.count();
+      const reportCount = await prisma.intelligenceReport.count();
+      const jobCount = await prisma.changeAnalysisJob.count();
+
+      res.json({
+        ok: true,
+        status: 'operational',
+        platform: 'AFRIQORA Satellite Intelligence Foundation (ML-01)',
+        cdse,
+        pipelines: {
+          sentinel1_sar: {
+            status: 'operational',
+            sensor: 'C-Band Synthetic Aperture Radar (SAR)',
+            polarizations: ['VV', 'VH'],
+            calibration: 'Radiometric Calibration DN -> dB (Sigma0)',
+            filters: ['Lee Speckle Filter (3x3, 5x5)'],
+            capabilities: ['All-weather surface roughness', 'Structural displacement', 'Bi-temporal anomaly differencing']
+          },
+          sentinel2_optical: {
+            status: 'operational',
+            sensor: 'Multi-Spectral Instrument (MSI)',
+            bands: ['B02 (Blue)', 'B03 (Green)', 'B04 (Red)', 'B08 (NIR)', 'B11 (SWIR1)', 'B12 (SWIR2)'],
+            spectralIndices: ['NDVI', 'NDWI', 'SAVI', 'NBR'],
+            capabilities: ['Vegetation loss quantification', 'Water body extent', 'Multi-spectral change detection']
+          }
+        },
+        dataSources: {
+          copernicus_cdse: {
+            type: 'European Space Agency (ESA) Copernicus Data Space Ecosystem',
+            mode: cdse.hasCredentials ? 'LIVE_OAUTH2_KEYCLOAK' : 'CALIBRATED_BENCHMARK_GRID',
+            authMethod: cdse.authMethod,
+            catalogueEndpoint: cdse.catalogueEndpoint
+          },
+          stac_open: {
+            type: 'SpatioTemporal Asset Catalog (STAC)',
+            status: 'connected'
+          },
+          commercial_hr: {
+            type: 'High-Resolution Commercial Tasking',
+            status: 'standby'
+          }
+        },
+        metrics: {
+          activeAreasOfInterest: targetCount,
+          archivedReports: reportCount,
+          completedAnalysisJobs: jobCount
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  public static async getAlerts(req: Request, res: Response): Promise<void> {
+    try {
+      const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 10;
+      const recentChanges = await prisma.changeAnalysisJob.findMany({
+        where: { changeDetected: true },
+        include: {
+          target: { select: { id: true, name: true, category: true, country: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+
+      const alerts = recentChanges.map((job) => ({
+        id: job.id,
+        targetId: job.targetId,
+        targetName: job.target.name,
+        category: job.target.category,
+        country: job.target.country,
+        analysisType: job.analysisType,
+        pipelineUsed: job.pipelineUsed,
+        changeAreaHectares: job.changeAreaHectares,
+        confidenceScore: job.confidenceScore,
+        createdAt: job.createdAt,
+      }));
+
+      res.json({ ok: true, count: alerts.length, alerts });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
   public static getAuthStatus(req: Request, res: Response): void {
     const status = SatelliteController.copernicus.getAuthStatus();
     res.json({ ok: true, cdse: status });
@@ -512,11 +599,38 @@ export class SatelliteController {
     }
   }
 
-  public static async getTargets(req: Request, res: Response): Promise<void> {
+    public static async getTargets(req: Request, res: Response): Promise<void> {
     try {
-      const targets = await prisma.satelliteTarget.findMany({
+      let targets = await prisma.satelliteTarget.findMany({
         orderBy: { name: 'asc' },
       });
+
+      if (targets.length === 0) {
+        for (const p of PRESET_LOCATIONS) {
+          const category = p.name.toLowerCase().includes('mining')
+            ? 'mining'
+            : p.name.toLowerCase().includes('port')
+            ? 'port'
+            : p.name.toLowerCase().includes('commercial') || p.name.toLowerCase().includes('industrial')
+            ? 'infrastructure'
+            : 'urban';
+
+          await prisma.satelliteTarget.create({
+            data: {
+              name: p.name,
+              category,
+              country: p.country,
+              centerLat: p.lat,
+              centerLon: p.lon,
+              bbox: JSON.stringify(p.bbox),
+              description: `${p.suburb}, ${p.city}, ${p.country}`,
+            },
+          });
+        }
+        targets = await prisma.satelliteTarget.findMany({
+          orderBy: { name: 'asc' },
+        });
+      }
 
       const formatted = targets.map((t: any) => {
         let bboxArray: GeoBoundingBox = [t.centerLon - 0.05, t.centerLat - 0.05, t.centerLon + 0.05, t.centerLat + 0.05];
@@ -536,7 +650,6 @@ export class SatelliteController {
           centerLon: t.centerLon,
           bbox: bboxArray,
           description: t.description,
-          defaultAnalysisIntent: t.defaultAnalysisIntent,
         };
       });
 

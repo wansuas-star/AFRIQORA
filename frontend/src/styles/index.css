@@ -274,3 +274,50 @@ body {
   background: var(--accent-strong);
 }
 
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   AFRIQORA 9-Pillar Sidebar & Shell Layout
+   ───────────────────────────────────────────────────────────────────────────── */
+.afriqora-app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  position: relative;
+}
+
+.desktop-sidebar-container {
+  display: block;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 40;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 1023px) {
+  .desktop-sidebar-container {
+    display: none !important;
+  }
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+  .mobile-brand {
+    display: none !important;
+  }
+}

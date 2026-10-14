@@ -27,7 +27,8 @@ const register = async (req, res) => {
                 afriqoraId,
             }
         });
-        const token = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+        const jwtSecret = process.env.JWT_SECRET || 'afriqora_development_isolated_jwt_secret_2026';
+        const token = jsonwebtoken_1.default.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' });
         res.status(201).json({ token, user: { id: user.id, email: user.email, displayName: user.displayName, afriqoraId: user.afriqoraId } });
     }
     catch (error) {
@@ -47,7 +48,8 @@ const login = async (req, res) => {
         if (!validPassword) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
-        const token = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+        const jwtSecret = process.env.JWT_SECRET || 'afriqora_development_isolated_jwt_secret_2026';
+        const token = jsonwebtoken_1.default.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, displayName: user.displayName, afriqoraId: user.afriqoraId } });
     }
     catch (error) {

@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "buildCommand": "npm run --prefix frontend build",
+  "outputDirectory": "frontend/dist",
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

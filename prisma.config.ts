@@ -4,7 +4,4 @@ export default defineConfig({
   datasource: {
     url: "file:./dev.db",
   },
-  migrate: {
-    url: "file:./dev.db",
-  },
 });

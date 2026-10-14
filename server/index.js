@@ -1362,34 +1362,6 @@ app.post('/connect/connect', (req, res) => {
   res.json({ ok: true, service, connected: true, permissions: state.connects[userId][service].meta.permissions });
 });
 
-// disconnect a service
-app.post('/connect/disconnect', (req, res) => {
-  const { service, userId } = req.body || {};
-  if (!service || !userId) return res.status(400).json({ error: 'service and userId required' });
-  const state = ensureState();
-  if (state.connects && state.connects[userId] && state.connects[userId][service]) {
-    delete state.connects[userId][service];
-    saveState(state);
-  }
-  res.json({ ok: true, service, connected: false });
-});
-
-// request withdrawal (simulate)
-app.post('/creator/:id/withdraw', (req, res) => {
-  const id = req.params.id; const body = req.body || {}; const amount = Number(body.amount || 0);
-  const state = ensureState(); state.creators = state.creators || {}; if (!state.creators[id]) state.creators[id] = { totalViews: 0, earnings: 0, availableBalance: 0, withdrawals: [] };
-  // enforce payout eligibility threshold (from persisted settings when available)
-  const creatorViews = Number(state.creators[id].totalViews || 0);
-  const threshold = Number((state.settings && state.settings.payoutThreshold) || PAYOUT_VIEWS_THRESHOLD);
-  if (creatorViews < threshold) return res.status(400).json({ error: `Withdrawal eligibility requires ${threshold} valid views. You have ${creatorViews}.` });
-  const avail = Number(state.creators[id].availableBalance || 0);
-  if (amount <= 0 || amount > avail) return res.status(400).json({ error: 'invalid amount' });
-  state.creators[id].availableBalance = +(avail - amount).toFixed(6);
-  const w = { id: 'w-' + Date.now(), amount, requestedAt: new Date().toISOString(), status: 'pending' };
-  state.creators[id].withdrawals.unshift(w);
-  saveState(state);
-  res.json({ ok: true, withdrawal: w });
-});
 
 // disconnect a service
 app.post('/connect/disconnect', async (req, res) => {

@@ -2,82 +2,113 @@ import React, { useState, useEffect } from 'react';
 import { SearchItem } from '../types';
 import { searchApi } from '../services/api';
 import { Search, X, Building2, User, Globe, ArrowRight } from 'lucide-react';
+import { NavTab } from './Sidebar';
 
 interface UnifiedSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
+  setActiveTab?: (tab: NavTab) => void;
 }
 
-export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, onClose }) => {
+export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({
+  isOpen,
+  onClose,
+  setActiveTab,
+}) => {
   const [query, setQuery] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [results, setResults] = useState<SearchItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const fetchResults = async (qText: string, tFilter: string) => {
+    try {
+      setLoading(true);
+      const typeParam = tFilter === 'profiles' ? 'users' : tFilter;
+      const res = await searchApi.search(qText, typeParam, 20);
+      setResults(res.items || []);
+    } catch (err) {
+      console.error('Search error:', err);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) return;
-
-    const timer = setTimeout(async () => {
-      if (!query.trim()) {
-        setResults([]);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const res = await searchApi.search(query, selectedType, 20);
-        setResults(res.items || []);
-      } catch (err) {
-        console.error('Search error:', err);
-      } finally {
-        setLoading(false);
-      }
-    }, 200);
+    const timer = setTimeout(() => {
+      fetchResults(query, selectedType);
+    }, 120);
 
     return () => clearTimeout(timer);
   }, [query, selectedType, isOpen]);
 
   if (!isOpen) return null;
 
+  const handleResultClick = (item: SearchItem) => {
+    if (setActiveTab) {
+      if (item.type === 'satellite_target') {
+        setActiveTab('change-intelligence');
+      } else if (item.type === 'businesses') {
+        setActiveTab('business-intelligence');
+      } else if (item.type === 'users') {
+        setActiveTab('settings');
+      }
+    }
+    onClose();
+  };
+
   const typeIcons: Record<string, React.ReactNode> = {
-    satellite_target: <Globe size={16} style={{ color: '#10b981' }} />,
+    satellite_target: <Globe size={16} style={{ color: '#34d399' }} />,
     businesses: <Building2 size={16} style={{ color: 'var(--accent)' }} />,
     users: <User size={16} style={{ color: 'var(--gold)' }} />,
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 100,
-      display: 'grid',
-      placeItems: 'start center',
-      background: 'rgba(4, 9, 18, 0.75)',
-      backdropFilter: 'blur(12px)',
-      padding: '4rem 1rem 1rem',
-    }}>
-      <div className="glass-panel animate-fade-in" style={{
-        width: '100%',
-        maxWidth: '620px',
-        maxHeight: '80vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-lg)',
-      }}>
-        {/* Search Input Bar */}
-        <div style={{
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'grid',
+        placeItems: 'start center',
+        background: 'rgba(4, 9, 18, 0.75)',
+        backdropFilter: 'blur(12px)',
+        padding: '4rem 1rem 1rem',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="glass-panel animate-fade-in"
+        style={{
+          width: '100%',
+          maxWidth: '620px',
+          maxHeight: '80vh',
           display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          padding: '1rem 1.25rem',
-          borderBottom: '1px solid var(--border)',
-        }}>
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow-lg)',
+          background: 'rgba(15, 23, 42, 0.95)',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+        }}
+      >
+        {/* Search Input Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '1rem 1.25rem',
+            borderBottom: '1px solid var(--border)',
+          }}
+        >
           <Search size={20} style={{ color: 'var(--accent)' }} />
           <input
             type="text"
             autoFocus
-            placeholder="Search satellite AOIs, African enterprises, professional profiles, or locations..."
+            placeholder="Search satellite AOIs, African enterprises, or profiles..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{
@@ -89,32 +120,50 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
               outline: 'none',
             }}
           />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="btn btn-ghost"
+              style={{ padding: '0.35rem', color: '#94a3b8' }}
+            >
+              <X size={16} />
+            </button>
+          )}
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.35rem' }}>
             <X size={20} />
           </button>
         </div>
 
         {/* Filter Pills */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          padding: '0.75rem 1.25rem',
-          background: 'rgba(255,255,255,0.02)',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          {['all', 'satellite', 'businesses', 'users'].map((t) => (
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            padding: '0.75rem 1.25rem',
+            background: 'rgba(255,255,255,0.02)',
+            borderBottom: '1px solid var(--border)',
+          }}
+        >
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'satellite', label: 'Satellite' },
+            { id: 'businesses', label: 'Businesses' },
+            { id: 'profiles', label: 'Profiles' },
+          ].map((t) => (
             <button
-              key={t}
-              onClick={() => setSelectedType(t)}
-              className={'btn ' + (selectedType === t ? 'btn-primary' : 'btn-ghost')}
+              key={t.id}
+              onClick={() => setSelectedType(t.id)}
+              className={'btn ' + (selectedType === t.id ? 'btn-primary' : 'btn-ghost')}
               style={{
                 fontSize: '0.78rem',
                 padding: '0.25rem 0.75rem',
                 borderRadius: 'var(--radius-full)',
                 textTransform: 'capitalize',
+                background: selectedType === t.id ? '#0ea5e9' : 'transparent',
+                color: selectedType === t.id ? '#ffffff' : '#94a3b8',
               }}
             >
-              {t === 'users' ? 'Profiles' : t}
+              {t.label}
             </button>
           ))}
         </div>
@@ -127,13 +176,14 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
             </div>
           ) : results.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              {query ? 'No matching results found.' : 'Type a query to search across satellite intelligence, enterprises, and professional profiles.'}
+              No matching records found for this filter.
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '0.65rem' }}>
               {results.map((item) => (
                 <div
                   key={item.type + '-' + item.id}
+                  onClick={() => handleResultClick(item)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -146,32 +196,55 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
                     cursor: 'pointer',
                   }}
                   className="glass-panel-hover"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)';
+                    e.currentTarget.style.borderColor = '#38bdf8';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                      padding: '0.5rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'rgba(255,255,255,0.05)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                    <div
+                      style={{
+                        padding: '0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255,255,255,0.05)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
                       {typeIcons[item.type] || <Search size={16} />}
                     </div>
 
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <strong style={{ fontSize: '0.95rem' }}>{item.title}</strong>
-                        <span className="badge" style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <strong style={{ fontSize: '0.95rem', color: '#f8fafc' }}>{item.title}</strong>
+                        <span
+                          className="badge"
+                          style={{
+                            fontSize: '0.65rem',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#38bdf8',
+                            padding: '0.1rem 0.4rem',
+                            borderRadius: '4px',
+                          }}
+                        >
                           {item.type.replace('_', ' ')}
                         </span>
                       </div>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
-                        {item.description || item.location || item.subtitle || 'AFRIQORA Verified'}
+                        {item.description || item.location || item.subtitle || 'AFRIQORA Verified Target'}
                       </p>
                     </div>
                   </div>
 
-                  <ArrowRight size={16} style={{ color: 'var(--text-dim)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#38bdf8', flexShrink: 0, marginLeft: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Open</span>
+                    <ArrowRight size={14} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -181,3 +254,4 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({ isOpen, 
     </div>
   );
 };
+export default UnifiedSearchModal;

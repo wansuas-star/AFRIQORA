@@ -1,11 +1,11 @@
 import {
   User,
   BusinessProfile,
-  Withdrawal,
   Notification,
   SearchItem,
   AdCampaign,
-  MerchantTransaction
+  MerchantTransaction,
+  MerchantAnalytics,
 } from '../types';
 
 const API_BASE = '/api';
@@ -70,7 +70,7 @@ export const authApi = {
 };
 
 // 2. Enterprise & Business Profile API
-export const creatorApi = {
+export const businessApi = {
   upsertBusinessProfile: (profile: Partial<BusinessProfile>) =>
     request<{ businessProfile: BusinessProfile }>('/commercial/business-profile', {
       method: 'POST',
@@ -85,15 +85,9 @@ export const creatorApi = {
 
   getBusinessProfile: (id: string) =>
     request<{ user: User; businessProfile: BusinessProfile | null }>('/commercial/business/' + encodeURIComponent(id)),
-
-  requestPayout: (amount: number, method: string, details?: string) =>
-    request<{ withdrawal: Withdrawal; message: string }>('/monetization/withdraw', {
-      method: 'POST',
-      body: JSON.stringify({ amount, method, details }),
-    }),
 };
 
-export const businessApi = creatorApi;
+export const creatorApi = businessApi;
 
 // 3. Operational Notifications API
 export const notificationsApi = {
@@ -136,14 +130,38 @@ export const searchApi = {
 
 // 6. Commercial Self-Service Infrastructure API
 export const commercialApi = {
+  getMerchantBusiness: () =>
+    request<{ business: BusinessProfile }>('/commercial/business'),
+
+  getCampaigns: () =>
+    request<{ success: boolean; campaigns: AdCampaign[] }>('/commercial/campaigns'),
+
   createCampaign: (campaign: any) =>
     request<{ success: boolean; campaign: AdCampaign; message: string }>('/commercial/campaigns', {
       method: 'POST',
       body: JSON.stringify(campaign),
     }),
 
-  getCampaigns: () =>
-    request<{ success: boolean; campaigns: AdCampaign[] }>('/commercial/campaigns'),
+  updateCampaignStatus: (id: string, status: string) =>
+    request<{ success: boolean; campaign: AdCampaign }>('/commercial/campaigns/' + encodeURIComponent(id) + '/status', {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+
+  recordAdClick: (campaignId: string, nonce: string) =>
+    request<{ success: boolean; targetUrl: string; exhausted: boolean }>('/commercial/ads/click', {
+      method: 'POST',
+      body: JSON.stringify({ campaignId, nonce }),
+    }),
+
+  getMerchantAnalytics: () =>
+    request<MerchantAnalytics>('/commercial/analytics'),
+
+  depositBudget: (data: { campaignId?: string; amount: number; paymentMethod?: string; reference: string }) =>
+    request<{ success: boolean; transaction: MerchantTransaction; message: string }>('/commercial/billing/fund', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   createDeposit: (amount: number, currency: string, paymentMethod: string) =>
     request<{ success: boolean; transaction: MerchantTransaction; message: string }>('/commercial/billing/fund', {
@@ -151,10 +169,13 @@ export const commercialApi = {
       body: JSON.stringify({ amount, currency, paymentMethod }),
     }),
 
-  getBillingSummary: () =>
-    request<{ success: boolean; history: any[] }>('/commercial/billing/history'),
+  getBillingHistory: () =>
+    request<{ success?: boolean; transactions?: MerchantTransaction[]; history?: any[] }>('/commercial/billing/history'),
 
-  submitVerification: (data: { registrationNumber?: string; taxId?: string; documentUrl?: string; documentsUrl?: string; businessName?: string }) =>
+  getBillingSummary: () =>
+    request<{ success?: boolean; transactions?: MerchantTransaction[]; history?: any[] }>('/commercial/billing/history'),
+
+  submitVerification: (data: { registrationNumber?: string; taxId?: string; documentUrl?: string; documentsUrl?: string; businessName?: string; category?: string; location?: string; country?: string }) =>
     request<{ success: boolean; message: string; verification: any }>('/commercial/verification', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -212,4 +233,21 @@ export const satelliteApi = {
 
   getTargets: () =>
     request<{ ok: boolean; targets: any[] }>('/satellite/targets'),
+
+  getChangePresets: () =>
+    request<{ ok: boolean; presets: any[] }>('/satellite/change/presets'),
+
+  analyzeChange: (payload: {
+    locationName?: string;
+    bbox?: number[];
+    date1?: string;
+    date2?: string;
+    sensorType?: string;
+    bandCombination?: string;
+    enableAiExplanation?: boolean;
+  }) =>
+    request<any>('/satellite/change/analyze', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };

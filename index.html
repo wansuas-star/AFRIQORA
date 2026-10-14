@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="AFRIQORA is a self-service platform giving businesses the tools to create, manage, and scale their own presence independently."
+      content="AFRIQORA is an African Space Technology, Satellite Intelligence and Information Platform delivering Earth observation, radar change detection, mining intelligence, and African geospatial information."
     />
     <meta name="robots" content="index,follow" />
     <meta name="geo.region" content="KE" />
     <meta name="geo.placename" content="Nairobi" />
     <meta name="theme-color" content="#07111f" />
-    <title>AFRIQORA | Website Strategy, Branding & Lead Generation</title>
+    <title>AFRIQORA — African Satellite Intelligence Platform</title>
+    <link rel="icon" type="image/png" href="/assets/afriqora-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -25,8 +26,8 @@
         "@type": "Organization",
         "name": "AFRIQORA",
         "url": "https://afriqora.com",
-        "description": "AFRIQORA is a self-service platform giving businesses the tools to create, manage, and scale their own presence independently.",
-        "areaServed": ["Kenya", "United Kingdom", "International"]
+        "description": "AFRIQORA is an African Space Technology, Satellite Intelligence and Information Platform.",
+        "areaServed": ["Africa", "Kenya", "South Africa", "DRC", "Egypt", "Nigeria", "International"]
       }
     </script>
     <script type="application/ld+json">
@@ -37,7 +38,7 @@
         "url": "https://afriqora.com",
         "potentialAction": {
           "@type": "SearchAction",
-          "target": "https://afriqora.com/#contact",
+          "target": "https://afriqora.com/?q={search_term}",
           "query-input": "required name=search_term"
         }
       }
@@ -45,10 +46,10 @@
   </head>
   <body>
     <header class="site-header">
-      <div class="container nav-wrap">
-        <a class="brand" href="#top" aria-label="AFRIQORA home">
-          <span class="brand-mark">A</span>
-          <span class="brand-name">AFRIQORA</span>
+      <div class="container nav-wrap" style="display: flex; align-items: center; justify-content: space-between;">
+        <a class="brand" href="#top" aria-label="AFRIQORA home" style="display: flex; align-items: center; gap: 0.65rem; text-decoration: none;">
+          <img src="/assets/afriqora-logo.png" alt="AFRIQORA Logo" style="width: 36px; height: 36px; object-fit: contain; border-radius: 8px; background: #ffffff; padding: 2px;" />
+          <span class="brand-name" style="font-weight: 800; font-size: 1.15rem; letter-spacing: 0.12em; color: #f8fafc;">AFRIQORA</span>
         </a>
         <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
           <span></span>
@@ -56,243 +57,195 @@
           <span></span>
         </button>
         <nav class="site-nav" aria-label="Primary navigation">
-          <a href="#home" data-i18n="nav.home">Home</a>
-          <a href="#search" data-i18n="nav.search">Search</a>
-          <a href="#activity" data-i18n="nav.activity">Activity</a>
-          <a href="#notifications" data-i18n="nav.notifications">Notifications</a>
-          <a href="#messages" data-i18n="nav.messages">Messages</a>
-          <a href="#profile" data-i18n="nav.profile">Profile</a>
-          <a href="#settings" data-i18n="nav.settings">Settings</a>
+          <a href="#overview">Overview</a>
+          <a href="#satellite">Satellite Intelligence</a>
+          <a href="#earth-observation">Earth Observation</a>
+          <a href="#mining">Mining Intelligence</a>
+          <a href="#business">Business Intelligence</a>
+          <a href="#jobs">Jobs &amp; Opportunities</a>
+          <a href="#search">Search</a>
+          <a href="#notifications">Notifications</a>
+          <a href="#settings">Account Settings</a>
         </nav>
       </div>
     </header>
 
     <main id="top">
-      <section class="hero">
+      {/* Hero Section */}
+      <section class="hero" id="overview">
         <div class="container hero-grid">
           <div class="hero-copy">
-            <p class="eyebrow">The Business & Social Platform</p>
-            <h1>The ultimate self-service platform for your business.</h1>
+            <p class="eyebrow" style="color: #34d399; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">
+              African Space Technology &amp; Satellite Telemetry
+            </p>
+            <h1>AFRIQORA — African Satellite Intelligence Platform</h1>
             <p class="hero-text">
-              Create your account, manage your profile, and connect directly with your customers. No agencies. No middlemen. You are in total control.
+              AFRIQORA delivers sovereign Earth observation, radar change detection, and high-cadence geospatial intelligence across the African continent. By integrating multi-spectral optical imagery from Copernicus Sentinel-2 with cloud-penetrating Synthetic Aperture Radar (SAR) from Sentinel-1, AFRIQORA provides verified data for mining concession integrity, agricultural yield forecasts, transboundary water security, and infrastructure risk assessment.
             </p>
             <div class="hero-actions">
-              <a class="btn btn-primary" href="#" onclick="openAccountModal(); return false;">Register Your Business</a>
-              <a class="btn btn-secondary" href="#problems">Learn More</a>
+              <a class="btn btn-primary" href="#satellite" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+                Launch Satellite Intel
+              </a>
+              <a class="btn btn-secondary" href="#mining">
+                Mining Concession Radar
+              </a>
             </div>
             <ul class="hero-highlights">
-              <li>Post products & services</li>
-              <li>Direct customer messaging</li>
-              <li>Social engagement</li>
+              <li>Copernicus Sentinel-1/2 Telemetry</li>
+              <li>DInSAR Concession Subsidence</li>
+              <li>Zero Social Selling &amp; Pure Confidentiality</li>
             </ul>
           </div>
           <div class="hero-card" aria-label="AFRIQORA capabilities overview">
             <div class="card-glow"></div>
-            <h2>Built around complete independence and growth.</h2>
+            <h2>Sovereign African Geospatial Decision Support</h2>
             <p>
-              We focus on the parts that matter most: your services, your availability, and your direct connection to customers.
+              Independent orbital monitoring engineered for African resource corridors, sovereign institutions, and verified enterprise operations.
             </p>
             <div class="metric-list">
               <div>
-                <strong>Platform</strong>
-                <span>Self-serve tools</span>
+                <strong>Constellations</strong>
+                <span>Sentinel-1 SAR / 2 MSI</span>
               </div>
               <div>
-                <strong>Dashboard</strong>
-                <span>Total control</span>
+                <strong>Mining Radar</strong>
+                <span>1,420+ Concessions</span>
               </div>
               <div>
-                <strong>Connection</strong>
-                <span>Direct leads</span>
+                <strong>Resolution</strong>
+                <span>Sub-cm SAR DInSAR</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="section" id="about">
+      {/* Satellite Intelligence Section */}
+      <section class="section" id="satellite">
         <div class="container section-grid">
           <div>
-            <p class="eyebrow">The platform</p>
-            <h2>We provide the infrastructure for businesses to present their value and turn attention into action.</h2>
+            <p class="eyebrow">Multi-Sensor Constellations</p>
+            <h2>High-Cadence Satellite Intelligence Across 54 African Nations</h2>
           </div>
           <div>
             <p>
-              When businesses rely on third-party agencies to update their information, opportunities are lost and costs rise. AFRIQORA provides a unified, self-service dashboard where you can manage your own profile, list your services, and connect with your audience directly.
+              Direct programmatic downlinks from European Space Agency Copernicus Sentinel-1 Synthetic Aperture Radar and Sentinel-2 Multi-Spectral Instruments. Analyze surface texture, track rapid infrastructure developments, and monitor maritime transit choke points regardless of cloud cover.
             </p>
             <p>
-              The result is a faster, more flexible digital presence that you control entirely on your own terms.
+              Ask AFRIQORA integrates natural language query parsing with verifiable evidence dossiers categorized into Observed, Detected, Inferred, and Unknown facts.
             </p>
           </div>
         </div>
       </section>
 
-      <section class="section" id="who-we-help">
+      {/* Earth Observation Section */}
+      <section class="section" id="earth-observation">
         <div class="container">
           <div class="section-heading">
-            <p class="eyebrow">Who uses the platform</p>
-            <h2>Built for independent businesses, freelancers, and service providers who want total control over their growth.</h2>
+            <p class="eyebrow">Earth Observation</p>
+            <h2>Multi-Spectral Analytics for African Ecosystems &amp; Basins</h2>
           </div>
           <div class="card-grid">
             <article class="info-card">
-              <h3>Independent businesses</h3>
-              <p>Who want a professional digital storefront they can manage themselves without relying on agencies.</p>
+              <h3>Normalized Difference Vegetation Index (NDVI)</h3>
+              <p>Continuous monitoring of sub-Saharan agricultural zones, drought indices, and biomass density using Sentinel-2 B08 (NIR) and B04 (Red) bands.</p>
             </article>
             <article class="info-card">
-              <h3>Service providers</h3>
-              <p>Who need to list their offerings, manage pricing, and receive direct customer enquiries.</p>
+              <h3>Normalized Difference Water Index (NDWI)</h3>
+              <p>Hydrological tracking for transboundary basins including the Grand Ethiopian Renaissance Dam (GERD), Lake Chad, and the Congo River system.</p>
             </article>
             <article class="info-card">
-              <h3>Growing brands</h3>
-              <p>That require a scalable, self-serve platform to centralize their customer acquisition.</p>
+              <h3>SWIR Geology &amp; Mineral Alteration</h3>
+              <p>Short-Wave Infrared band combinations (B12, B08, B04) delineating exposed mineral outcrops, clay alteration zones, and soil moisture.</p>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section" id="services">
+      {/* Mining Intelligence Section */}
+      <section class="section" id="mining">
         <div class="container">
           <div class="section-heading">
-            <p class="eyebrow">Platform Capabilities</p>
-            <h2>Everything you need to run your business profile, managed from one dashboard.</h2>
+            <p class="eyebrow">Mining Intelligence</p>
+            <h2>Radar Interferometry for Strategic African Mineral Corridors</h2>
           </div>
           <div class="card-grid services-grid">
             <article class="info-card">
-              <h3>Complete Self-Management</h3>
-              <p>Every business registers and manages its own profile, posts, photos, and videos. You own your storefront.</p>
+              <h3>Katanga Copper &amp; Cobalt Belt</h3>
+              <p>Continuous DInSAR surveillance over Kolwezi, Tenke Fungurume, and Mutanda tracking open pit slope deformation and haul road traffic.</p>
             </article>
             <article class="info-card">
-              <h3>Direct Customer Connection</h3>
-              <p>You control your contact methods. Customers reach out to you directly—we never stand in the middle.</p>
+              <h3>Zambian Copperbelt</h3>
+              <p>Sub-millimeter radar interferometry monitoring pit wall stability and leach pad integrity across Kansanshi, Kitwe, and Mufulira.</p>
             </article>
             <article class="info-card">
-              <h3>Built-in Social Growth</h3>
-              <p>Build an audience. Users can like, comment, share, and follow your business directly on the platform.</p>
+              <h3>Tailings Storage Facility (TSF) Security</h3>
+              <p>Early-warning geotechnical displacement alerts across 380+ African tailings dams with 5-day revisit telemetry.</p>
             </article>
             <article class="info-card">
-              <h3>Future-Ready Communication</h3>
-              <p>Stay connected with powerful built-in tools. Designed for upcoming voice and video calls, group chats, and online meetings.</p>
+              <h3>Artisanal Encroachment Detection</h3>
+              <p>Automated perimeter disturbance alerts detecting unauthorized earthworks and vegetation clearing outside licensed concession boundaries.</p>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section" id="problems">
+      {/* Business Intelligence & Jobs */}
+      <section class="section" id="business">
         <div class="container split-grid">
           <div>
-            <p class="eyebrow">Why join AFRIQORA</p>
-            <h2>Take control of your digital storefront without relying on expensive agencies.</h2>
+            <p class="eyebrow">Business &amp; Geospatial Intelligence</p>
+            <h2>Verified African Enterprise Registry &amp; Aerospace Opportunities</h2>
             <p>
-              AFRIQORA gives you direct control over how customers find and interact with your business, cutting out the middleman and giving you the keys to your own growth.
+              AFRIQORA integrates corporate verification with satellite intelligence. Verified African enterprises gain priority indexing, official badge status, and authenticated procurement credentials.
             </p>
           </div>
-          <div class="stack-list">
+          <div class="stack-list" id="jobs">
             <div>
-              <strong>No more agencies</strong>
-              <p>Stop paying retainers just to update your service list or business hours.</p>
+              <strong>Space &amp; Geospatial Careers</strong>
+              <p>Access high-value roles in radar analytics, satellite ground station engineering, and remote sensing across African space agencies.</p>
             </div>
             <div>
-              <strong>Instant visibility</strong>
-              <p>Register, list your services, and go live immediately to start accepting leads.</p>
+              <strong>AU Tenders &amp; Earth Observation RFPs</strong>
+              <p>Direct participation in continental geospatial procurement, environmental baseline studies, and natural resource audits.</p>
             </div>
             <div>
-              <strong>Complete ownership</strong>
-              <p>You manage your data, your pricing, and your direct relationships with your customers.</p>
+              <strong>Verified Enterprise Directory</strong>
+              <p>Discover verified African suppliers, logistics operators, and technical consultancies operating across mineral and agricultural supply chains.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="section" id="why-us">
+      {/* Architecture & Confidentiality */}
+      <section class="section" id="settings">
         <div class="container">
           <div class="section-heading">
-            <p class="eyebrow">Core Philosophy</p>
-            <h2>Empowering independent businesses to succeed on their own terms.</h2>
+            <p class="eyebrow">Data Governance</p>
+            <h2>Strict Confidentiality &amp; Sovereign Data Protection</h2>
           </div>
           <div class="feature-list">
             <article class="feature-item">
-              <h3>Total Autonomy</h3>
-              <p>You own your data and manage your services. Our platform simply provides the canvas for your business.</p>
+              <h3>Zero Social Feeds or Profiling</h3>
+              <p>No ad tracking, social algorithms, or commercial consumer feeds. Pure enterprise-grade geospatial analytics.</p>
             </article>
             <article class="feature-item">
-              <h3>Built for scale</h3>
-              <p>Whether you offer one service or a hundred, the platform adapts to your catalog automatically.</p>
+              <h3>Owner-Only Access Governance</h3>
+              <p>Investigative workspaces enforce rigorous data segregation and non-repudiation audit trails.</p>
             </article>
             <article class="feature-item">
-              <h3>Direct communication</h3>
-              <p>We don't get in the middle. You talk directly to your leads and manage your own sales pipeline.</p>
+              <h3>Programmatic API &amp; CDSE Integration</h3>
+              <p>Direct token-based API access for integrating Sentinel GeoTIFFs, change vectors, and concession alerts into your existing GIS workflows.</p>
             </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section testimonials" id="testimonials">
-        <div class="container">
-          <div class="section-heading">
-            <p class="eyebrow">Community success</p>
-            <h2>What businesses achieve with self-service tools</h2>
-          </div>
-          <div class="testimonial-grid">
-            <article class="quote-card">
-              <p>“Being able to update my own service pricing instantly without waiting for a developer has completely transformed how quickly I can run promotions.”</p>
-              <span>— Independent Consultant</span>
-            </article>
-            <article class="quote-card">
-              <p>“The dashboard is incredibly intuitive. I registered my business and had my first customer enquiry flowing into my own inbox the very next day.”</p>
-              <span>— Boutique Agency Owner</span>
-            </article>
-            <article class="quote-card">
-              <p>“I finally have total control over my digital presence. No retainers, no waiting. Just a powerful platform that connects me to clients.”</p>
-              <span>— Freelance Service Provider</span>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section faq" id="faq">
-        <div class="container faq-wrap">
-          <div class="section-heading">
-            <p class="eyebrow">Frequently asked questions</p>
-            <h2>Everything you need to know about joining</h2>
-          </div>
-          <div class="faq-items">
-            <details open>
-              <summary>How do I get started?</summary>
-              <p>Create an account, register your business, and complete your profile. The entire process takes less than ten minutes and you can start listing services immediately.</p>
-            </details>
-            <details>
-              <summary>Who manages my profile and website?</summary>
-              <p>You do. You have 100% control over your services, pricing, and content through your own self-service dashboard. No agencies required.</p>
-            </details>
-            <details>
-              <summary>How do customers contact me?</summary>
-              <p>Customers reach out to you directly through the platform based on the contact information you provide in your profile.</p>
-            </details>
-          </div>
-        </div>
-      </section>
-
-      <section class="section contact" id="register">
-        <div class="container contact-grid" style="display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 600px; margin: 0 auto;">
-          <div class="contact-copy">
-            <p class="eyebrow">Join the platform</p>
-            <h2>Ready to list your business?</h2>
-            <p>
-              Create your account, set up your profile, and start reaching more customers today.
-            </p>
-            <div class="contact-cta-row" style="justify-content: center; margin-top: 2rem;">
-              <button class="btn btn-primary" onclick="openAccountModal()">Create Account</button>
-              <button class="btn btn-secondary" onclick="openAccountModal()">Log In</button>
-            </div>
           </div>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <div class="container footer-wrap">
-        <p>© <span id="year"></span> AFRIQORA. All rights reserved.</p>
-        <a href="#top">Back to top</a>
+      <div class="container footer-wrap" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 0;">
+        <p>&copy; <span id="year">2026</span> AFRIQORA &bull; African Space Technology, Satellite Intelligence &amp; Information Platform.</p>
+        <a href="#top" style="color: #38bdf8; text-decoration: none;">Back to top</a>
       </div>
     </footer>
 

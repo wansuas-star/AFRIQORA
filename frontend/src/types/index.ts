@@ -10,6 +10,8 @@ export interface User {
   contact?: string;
   profilePhoto?: string;
   createdAt?: string;
+  isPlatformOwner?: boolean;
+  role?: string;
   _count?: {
     followers?: number;
     following?: number;
@@ -132,7 +134,8 @@ export interface AuthResponse {
 }
 
 export interface SearchItem {
-  type: 'people' | 'businesses' | 'services' | 'posts' | 'videos';
+  type: 'businesses' | 'satellite' | 'satellite_target' | 'concessions' | 'jobs' | 'users' | 'profiles' | string;
+  metadata?: Record<string, any>;
   id: string;
   campaignId?: string;
   title: string;

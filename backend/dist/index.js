@@ -60,6 +60,18 @@ app.use('/api/messaging', messaging_routes_1.default);
 app.use('/api/interactions', decommissionedSocialHandler);
 app.use('/api/comments', decommissionedSocialHandler);
 app.use('/api/social', decommissionedSocialHandler);
+// Decommissioned Marketplace Endpoints (HTTP 410 Gone)
+const decommissionedMarketplaceHandler = (_req, res) => {
+    res.status(410).json({
+        error: 'AFRIQORA is an African space-technology, satellite intelligence and information platform. Marketplace functionality has been permanently decommissioned.',
+        code: 'MARKETPLACE_DECOMMISSIONED'
+    });
+};
+app.use('/api/marketplace', decommissionedMarketplaceHandler);
+app.use('/api/market', decommissionedMarketplaceHandler);
+app.use('/api/shop', decommissionedMarketplaceHandler);
+app.use('/api/products', decommissionedMarketplaceHandler);
+app.use('/api/cart', decommissionedMarketplaceHandler);
 // Health checks
 app.get('/api/health', (_req, res) => {
     res.json({

@@ -106,24 +106,23 @@ export const moderateVerification = async (req: AuthenticatedRequest, res: Respo
 
     const isApproved = action === 'approve';
 
-    await prisma.$transaction(async (tx) => {
-      await tx.businessVerification.update({
+    await prisma.$transaction([
+      prisma.businessVerification.update({
         where: { id },
         data: {
           status: isApproved ? 'approved' : 'rejected',
           adminNotes: adminNotes || null,
           reviewedAt: new Date(),
         },
-      });
-
-      await tx.businessProfile.update({
+      }),
+      prisma.businessProfile.update({
         where: { id: verification.businessId },
         data: {
           isVerified: isApproved,
           verificationStatus: isApproved ? 'verified' : 'rejected',
         },
-      });
-    });
+      }),
+    ]);
 
     res.json({
       success: true,

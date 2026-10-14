@@ -117,9 +117,29 @@ export class IntegrationHub {
       throw new Error('Unauthorized: Connector does not belong to the investigating agency');
     }
 
-    // 4. Internal Release Governance
-    // Platform Owner approval is the sole internal authorization authority.
-    // If legal reference is provided, it is recorded in the audit trail without acting as a separate internal blocking gate.
+    // 4. Statutory Legal Mandate & Warrant Requirement
+    if (integration.requiresWarrant && (!scope.legalMandateRef || !scope.legalMandateRef.trim())) {
+      await this.logAudit({
+        agencyId: integration.agencyId,
+        officerId: scope.officerId,
+        caseId: scope.caseId,
+        action: 'ACCESS_DENIED_MISSING_WARRANT',
+        resourceAccessed: integration.name,
+        warrantRef: scope.legalMandateRef,
+        ipAddress,
+        userAgent,
+        details: { reason: 'Legal warrant or statutory mandate reference is strictly required for this connector' },
+      });
+
+      return {
+        adapterId: integration.id,
+        category: integration.category as any,
+        status: 'ACCESS_DENIED',
+        assets: [],
+        epistemicTier: 'UNAVAILABLE_INFORMATION',
+        message: `Legal warrant or mandate is required for connector '${integration.name}'. Access denied.`,
+      };
+    }
 
     // 4.1 Mandatory Platform Owner Approval Policy (Gate 2)
     // Enforces: Government status or court warrant alone is NOT authorization.
@@ -150,11 +170,39 @@ export class IntegrationHub {
       } catch (e) {}
     }
 
+    let revokedGrant: any = null;
+    if (!activeGrant) {
+      revokedGrant = await prisma.platformOwnerGrant.findFirst({
+        where: {
+          agencyId: scope.agencyId,
+          OR: [
+            { caseId: scope.caseId },
+            { caseId: null },
+          ],
+          AND: [
+            {
+              OR: [
+                { status: 'REVOKED' },
+                { revokedAt: { not: null } },
+              ],
+            },
+          ],
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
     if (!activeGrant || isGrantExpired) {
-      const denialReason = isGrantExpired
-        ? 'Platform Owner access grant has EXPIRED'
-        : (activeGrant ? 'Platform access request is invalid' : 'No Platform Owner access approval exists for this agency or case');
-      const action = isGrantExpired ? 'ACCESS_DENIED_EXPIRED_OWNER_GRANT' : 'ACCESS_DENIED_PENDING_OWNER_APPROVAL';
+      let denialReason = 'No Platform Owner access approval exists for this agency or case';
+      let action = 'ACCESS_DENIED_PENDING_OWNER_APPROVAL';
+
+      if (revokedGrant) {
+        denialReason = 'Platform Owner access grant has been REVOKED';
+        action = 'ACCESS_DENIED_REVOKED_OWNER_GRANT';
+      } else if (isGrantExpired) {
+        denialReason = 'Platform Owner access grant has EXPIRED';
+        action = 'ACCESS_DENIED_EXPIRED_OWNER_GRANT';
+      }
 
       await this.logAudit({
         agencyId: integration.agencyId,
@@ -165,7 +213,7 @@ export class IntegrationHub {
         warrantRef: scope.legalMandateRef,
         ipAddress,
         userAgent,
-        details: { reason: denialReason, grantId: activeGrant?.id },
+        details: { reason: denialReason, grantId: activeGrant?.id || revokedGrant?.id },
       });
 
       return {
@@ -174,7 +222,7 @@ export class IntegrationHub {
         status: 'ACCESS_DENIED',
         assets: [],
         epistemicTier: 'UNAVAILABLE_INFORMATION',
-        message: `AFRIQORA Platform Access Denied: ${denialReason}. Explicit, unexpired Platform Owner authorization is strictly required.`,
+        message: `AFRIQORA Platform Access Denied: ${denialReason}. Government status or legal warrant alone does not grant platform access. Explicit, unexpired Platform Owner authorization is strictly required (PENDING_OWNER_APPROVAL).`,
       };
     }
 

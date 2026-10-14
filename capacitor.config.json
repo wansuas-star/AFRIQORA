@@ -1,7 +1,7 @@
 {
   "appId": "com.afriqora.app",
   "appName": "AFRIQORA",
-  "webDir": "www",
+  "webDir": "frontend/dist",
   "server": {
     "hostname": "app.afriqora.com",
     "iosScheme": "afriqora",

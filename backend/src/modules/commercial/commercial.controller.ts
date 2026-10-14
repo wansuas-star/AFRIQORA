@@ -494,7 +494,7 @@ export const upsertBusinessProfile = async (req: AuthenticatedRequest, res: Resp
       languagesServed: languagesServed ? (typeof languagesServed === 'string' ? languagesServed : JSON.stringify(languagesServed)) : null,
       faqs: faqs ? (typeof faqs === 'string' ? faqs : JSON.stringify(faqs)) : null,
       media: media ? (typeof media === 'string' ? media : JSON.stringify(media)) : null,
-      isMarketplace: isMarketplace === undefined ? true : Boolean(isMarketplace),
+      isMarketplace: false,
     };
 
     let profile;
@@ -512,7 +512,7 @@ export const upsertBusinessProfile = async (req: AuthenticatedRequest, res: Resp
       });
     }
 
-    res.status(200).json({ ok: true, profile });
+    res.status(200).json({ ok: true, profile, businessProfile: profile });
   } catch (err: any) {
     console.error('Error saving business profile:', err);
     res.status(500).json({ error: { message: err.message || 'Internal error' } });

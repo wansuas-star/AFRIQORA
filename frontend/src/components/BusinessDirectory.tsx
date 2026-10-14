@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BusinessProfile } from '../types';
-import { searchApi, creatorApi } from '../services/api';
+import { searchApi, businessApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Briefcase, MapPin, Phone, Globe, PlusCircle, CheckCircle2, Search, X, Building2 } from 'lucide-react';
@@ -69,7 +69,7 @@ export const BusinessDirectory: React.FC<{ openAuthModal: () => void }> = ({ ope
 
     setSubmitting(true);
     try {
-      const res = await creatorApi.upsertBusinessProfile({
+      const res = await businessApi.upsertBusinessProfile({
         businessName,
         category,
         location,

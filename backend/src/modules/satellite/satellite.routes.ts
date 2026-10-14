@@ -13,5 +13,8 @@ router.get('/timeseries', SatelliteController.getTimeSeries);
 router.get('/reports', SatelliteController.getReports);
 router.get('/targets', SatelliteController.getTargets);
 router.get('/tiles/preview', SatelliteController.previewTile);
+router.get('/change/presets', SatelliteController.getChangePresets);
+router.post('/change/analyze', SatelliteController.analyzeChange);
+router.get('/change/analyze', SatelliteController.analyzeChange);
 
 export default router;

@@ -8,7 +8,6 @@ import {
   Sparkles,
   Search,
   Bell,
-  Settings,
   Radio,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -105,11 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: unreadNotifications > 0 ? (unreadNotifications > 9 ? '9+' : unreadNotifications) : undefined,
       onClick: openNotifications,
     },
-    {
-      id: 'settings',
-      label: 'Account Settings',
-      icon: <Settings size={18} />,
-    },
+    
   ];
 
   const handleNavClick = (item: typeof navItems[0]) => {

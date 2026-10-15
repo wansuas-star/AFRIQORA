@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage, Language } from '../context/LanguageContext';
-import { Search, Bell, Globe, User as UserIcon, LogOut, Menu, X } from 'lucide-react';
+import { Search, Bell, Globe, LogOut, Menu, X } from 'lucide-react';
 
 interface HeaderProps {
   openAuthModal: () => void;
@@ -21,7 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   isMobileSidebarOpen,
 }) => {
   const { user, logout } = useAuth();
-  const { lang, setLang, t } = useLanguage();
+  const { lang, setLang } = useLanguage();
+  void openAuthModal;
 
   return (
     <header
@@ -166,8 +167,8 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
-          {/* User Profile / Auth Button */}
-          {user ? (
+          {/* User Profile (if active session exists) */}
+          {user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div
@@ -193,20 +194,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <LogOut size={16} />
               </button>
             </div>
-          ) : (
-            <button
-              className="btn btn-primary"
-              onClick={openAuthModal}
-              style={{
-                fontSize: '0.82rem',
-                padding: '0.45rem 0.95rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-              }}
-            >
-              <UserIcon size={15} />
-              {t('nav.signin')}
-            </button>
           )}
         </div>
       </div>

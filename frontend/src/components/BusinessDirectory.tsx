@@ -3,7 +3,7 @@ import { BusinessProfile } from '../types';
 import { searchApi, businessApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { Briefcase, MapPin, Phone, Globe, PlusCircle, CheckCircle2, Search, X, Building2 } from 'lucide-react';
+import { Briefcase, MapPin, Phone, Globe, CheckCircle2, Search, X, Building2 } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Technology', 'Renewable Energy', 'Agriculture', 'Consulting', 'Healthcare', 'Retail & Trade', 'Construction'];
 
@@ -124,14 +124,7 @@ export const BusinessDirectory: React.FC<{ openAuthModal: () => void }> = ({ ope
           </p>
         </div>
 
-        <button
-          className="btn btn-primary"
-          onClick={() => (user ? setIsRegisterOpen(true) : openAuthModal())}
-          style={{ padding: '0.75rem 1.5rem', fontSize: '0.95rem' }}
-        >
-          <PlusCircle size={18} />
-          {t('nav.registerBiz')}
-        </button>
+        
       </div>
 
       {/* Search & Category Filter Bar */}

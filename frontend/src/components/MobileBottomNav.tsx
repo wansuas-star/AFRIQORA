@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, Orbit, Layers, Pickaxe, User } from 'lucide-react';
+import { Compass, Orbit, Layers, Pickaxe, Search } from 'lucide-react';
 import { triggerHaptic } from '../services/device';
 import { NavTab } from './Sidebar';
 
@@ -139,10 +139,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         </span>
       </button>
 
-      {/* 5. Settings / Account */}
+      {/* 5. Search */}
       <button
-        onClick={() => handleTabClick('settings')}
-        className={'mobile-nav-item ' + (activeTab === 'settings' ? 'active' : '')}
+        onClick={() => handleTabClick('search')}
+        className={'mobile-nav-item ' + (activeTab === 'search' ? 'active' : '')}
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -150,15 +150,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           gap: '2px',
           background: 'none',
           border: 'none',
-          color: activeTab === 'settings' ? '#a78bfa' : 'var(--text-dim)',
+          color: activeTab === 'search' ? '#38bdf8' : 'var(--text-dim)',
           cursor: 'pointer',
           padding: '4px 6px',
           flex: 1,
         }}
       >
-        <User size={18} strokeWidth={activeTab === 'settings' ? 2.4 : 1.8} />
-        <span style={{ fontSize: '0.62rem', fontWeight: activeTab === 'settings' ? 700 : 500 }}>
-          Account
+        <Search size={18} strokeWidth={activeTab === 'search' ? 2.4 : 1.8} />
+        <span style={{ fontSize: '0.62rem', fontWeight: activeTab === 'search' ? 700 : 500 }}>
+          Search
         </span>
       </button>
     </nav>

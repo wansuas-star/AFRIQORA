@@ -1,4 +1,6 @@
+import { AfricanMaritimeRegistry } from '../maritimeRegistry';
 import {
+  AfricanPortRegistryEntry,
   GeoBoundingBox,
   OpticalScenePayload,
   RasterGrid,
@@ -395,7 +397,7 @@ export class CopernicusCDSEProvider implements ISatelliteProvider {
    * If live CDSE token is available, connects to Copernicus live stream;
    * otherwise provides deterministic calibrated reference grid with explicit provenance.
    */
-  public async fetchSARScene(sceneId: string, bbox: GeoBoundingBox): Promise<SARScenePayload> {
+  public async fetchSARScene(sceneId: string, bbox: GeoBoundingBox, targetPort?: AfricanPortRegistryEntry): Promise<SARScenePayload> {
     const token = await this.getAccessToken();
     const isLive = Boolean(token);
     const gridDim = 32;
@@ -415,6 +417,110 @@ export class CopernicusCDSEProvider implements ISatelliteProvider {
         return Number((base + noise).toFixed(2));
       })
     );
+
+    // Continental African Maritime & Port Radar Signature Simulation
+    const matchedPort = targetPort || AfricanMaritimeRegistry.findPortByBbox(bbox);
+    const isMaritime = sceneId.includes('MARITIME') || Boolean(matchedPort);
+
+    if (isMaritime) {
+      const portId = matchedPort ? matchedPort.id : (bbox[0] < 10 && bbox[1] > 0 ? 'lekki-deep-sea' : 'richards-bay');
+
+      if (portId === 'lekki-deep-sea') {
+        // Lekki Deep Sea Port anchorage & container berths (Nigeria, Gulf of Guinea):
+        // 1. Ultra-Large Container Ship at deepwater berth (240m length, 50m beam)
+        for (let r = 8; r <= 10; r++) {
+          for (let c = 12; c <= 17; c++) {
+            vvData[r][c] = Number((-2.9 + (Math.sin(r + c) * 0.35)).toFixed(2));
+            vhData[r][c] = Number((-9.1 + (Math.cos(r + c) * 0.35)).toFixed(2));
+          }
+        }
+        // 2. Oil Tanker at offshore waiting anchorage (160m length, 32m beam)
+        for (let r = 21; r <= 22; r++) {
+          for (let c = 18; c <= 22; c++) {
+            vvData[r][c] = Number((-3.9 + (Math.sin(r * c) * 0.35)).toFixed(2));
+            vhData[r][c] = Number((-10.4 + (Math.cos(r * c) * 0.35)).toFixed(2));
+          }
+        }
+      } else if (portId === 'richards-bay') {
+        // Richards Bay coal export terminal & approach channel (South Africa):
+        // 1. Capesize bulk coal carrier at deepwater anchorage (240m length, 50m beam)
+        for (let r = 10; r <= 12; r++) {
+          for (let c = 14; c <= 19; c++) {
+            vvData[r][c] = Number((-3.2 + (Math.sin(r + c) * 0.4)).toFixed(2));
+            vhData[r][c] = Number((-9.5 + (Math.cos(r + c) * 0.4)).toFixed(2));
+          }
+        }
+        // 2. Bulk carrier at approach channel (140m length, 35m beam)
+        for (let r = 20; r <= 21; r++) {
+          for (let c = 6; c <= 10; c++) {
+            vvData[r][c] = Number((-4.5 + (Math.sin(r * c) * 0.4)).toFixed(2));
+            vhData[r][c] = Number((-10.8 + (Math.cos(r * c) * 0.4)).toFixed(2));
+          }
+        }
+      } else if (portId.includes('tanger-med') || portId.includes('gibraltar')) {
+        // Tanger Med & Strait of Gibraltar (Morocco):
+        // 1. Ultra-Large Container Ship in transshipment corridor (280m length)
+        for (let r = 9; r <= 11; r++) {
+          for (let c = 11; c <= 17; c++) {
+            vvData[r][c] = Number((-2.6 + (Math.sin(r + c) * 0.3)).toFixed(2));
+            vhData[r][c] = Number((-8.8 + (Math.cos(r + c) * 0.3)).toFixed(2));
+          }
+        }
+        // 2. Ro-Ro passenger ferry crossing strait
+        for (let r = 19; r <= 20; r++) {
+          for (let c = 20; c <= 23; c++) {
+            vvData[r][c] = Number((-4.1 + (Math.sin(r * c) * 0.3)).toFixed(2));
+            vhData[r][c] = Number((-10.2 + (Math.cos(r * c) * 0.3)).toFixed(2));
+          }
+        }
+      } else if (portId.includes('suez') || portId.includes('alexandria')) {
+        // Suez Canal / Port Said / Alexandria (Egypt):
+        // 1. Northbound Convoy Container Ship (260m)
+        for (let r = 7; r <= 9; r++) {
+          for (let c = 13; c <= 18; c++) {
+            vvData[r][c] = Number((-2.8 + (Math.sin(r + c) * 0.3)).toFixed(2));
+            vhData[r][c] = Number((-9.0 + (Math.cos(r + c) * 0.3)).toFixed(2));
+          }
+        }
+        // 2. Waiting Anchorage Tanker
+        for (let r = 22; r <= 23; r++) {
+          for (let c = 10; c <= 14; c++) {
+            vvData[r][c] = Number((-3.7 + (Math.sin(r * c) * 0.3)).toFixed(2));
+            vhData[r][c] = Number((-10.1 + (Math.cos(r * c) * 0.3)).toFixed(2));
+          }
+        }
+      } else if (portId.includes('durban')) {
+        // Port of Durban (South Africa): Pier 2 Container Ship & Outer Anchorage
+        for (let r = 8; r <= 10; r++) {
+          for (let c = 10; c <= 15; c++) {
+            vvData[r][c] = Number((-3.1 + (Math.sin(r + c) * 0.35)).toFixed(2));
+            vhData[r][c] = Number((-9.3 + (Math.cos(r + c) * 0.35)).toFixed(2));
+          }
+        }
+      } else if (portId.includes('mombasa') || portId.includes('dar-es-salaam')) {
+        // Kilindini Harbour (Kenya) / Dar es Salaam (Tanzania):
+        for (let r = 11; r <= 13; r++) {
+          for (let c = 12; c <= 17; c++) {
+            vvData[r][c] = Number((-3.4 + (Math.sin(r + c) * 0.35)).toFixed(2));
+            vhData[r][c] = Number((-9.7 + (Math.cos(r + c) * 0.35)).toFixed(2));
+          }
+        }
+      } else if (matchedPort) {
+        // Generic African Port Calibration: Inject realistic metallic reflection matching port category
+        const isBulker = matchedPort.category === 'BULK_COMMODITY_PORT' || matchedPort.category === 'ENERGY_OIL_TERMINAL';
+        const startRow = 12;
+        const endRow = isBulker ? 14 : 13;
+        const startCol = 14;
+        const endCol = isBulker ? 19 : 18;
+
+        for (let r = startRow; r <= endRow; r++) {
+          for (let c = startCol; c <= endCol; c++) {
+            vvData[r][c] = Number((-3.3 + (Math.sin(r + c) * 0.3)).toFixed(2));
+            vhData[r][c] = Number((-9.6 + (Math.cos(r + c) * 0.3)).toFixed(2));
+          }
+        }
+      }
+    }
 
     return {
       sceneId,

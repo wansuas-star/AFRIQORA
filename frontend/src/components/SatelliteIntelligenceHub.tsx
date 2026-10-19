@@ -20,9 +20,11 @@ import {
   HelpCircle,
   Eye,
   Send,
-  Truck
+  Truck,
+  Ship
 } from 'lucide-react';
 import { SpectralLayerControls, SpectralLayerMode } from './satellite/SpectralLayerControls';
+import { GroundTruthReviewModal } from './satellite/GroundTruthReviewModal';
 
 interface LocationResult {
   name: string;
@@ -45,6 +47,8 @@ interface DetectedObject {
   classificationCertainty: string;
   technicalLimitationNotice?: string;
   description: string;
+  vesselMetrics?: any;
+  groundTruthVerification?: any;
 }
 
 interface EvidenceStructure {
@@ -166,6 +170,8 @@ export const SatelliteIntelligenceHub: React.FC = () => {
 
   // Active Mobile View
   const [mobileTab, setMobileTab] = useState<'map' | 'ask' | 'objects' | 'timeline'>('map');
+  const [selectedTimelineIdx, setSelectedTimelineIdx] = useState<number>(0);
+  const [reviewingVessel, setReviewingVessel] = useState<any | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
@@ -311,6 +317,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
   const dataSource = result?.unifiedObservation?.provenance?.dataSource || 'CALIBRATED_BENCHMARK_GRID';
   const detectedObjects = result?.detectedObjects || [];
   const landCover = result?.imageUnderstanding?.landCover;
+  const timeline = result?.timeline || [];
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-16">
@@ -555,7 +562,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                 <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
                 <div className="absolute top-4 left-4 z-10 bg-black/70 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Before: {result?.supportingImagery?.before?.date || '30 Days Ago'}</span>
+                  <span>BEFORE: {result?.supportingImagery?.before?.date || '30 Days Ago'}</span>
                 </div>
               </div>
 
@@ -594,7 +601,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
 
                 <div className="absolute top-4 right-4 z-10 bg-black/70 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
                   <Satellite className="w-3.5 h-3.5 text-amber-400" />
-                  <span>After: {result?.supportingImagery?.after?.date || 'Latest Pass'}</span>
+                  <span>AFTER: {result?.supportingImagery?.after?.date || 'Latest Pass'}</span>
                 </div>
               </div>
 
@@ -643,6 +650,68 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                 <div className="text-[10px] text-slate-500">10m Ground Sampling</div>
               </div>
             </div>
+
+            {/* Time-Series Timeline Scrubber Component */}
+            {timeline.length > 0 && (
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-xl">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 font-bold text-slate-200">
+                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Time-Series Timeline Scrubber</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">
+                      Milestone {selectedTimelineIdx + 1} of {timeline.length}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {timeline[selectedTimelineIdx]?.date}
+                  </span>
+                </div>
+
+                {/* Scrubber Buttons */}
+                <div className="flex items-center gap-2 pt-1 pb-1">
+                  {timeline.map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedTimelineIdx(idx)}
+                      className={`flex-1 flex flex-col items-center gap-1 py-1.5 px-1 rounded-xl transition-all border ${
+                        selectedTimelineIdx === idx
+                          ? 'bg-cyan-500/20 border-cyan-400/60 text-white shadow-lg shadow-cyan-950/40'
+                          : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+                      }`}
+                    >
+                      <div
+                        className={`w-2.5 h-2.5 rounded-full transition-transform ${
+                          selectedTimelineIdx === idx ? 'bg-cyan-400 scale-125' : 'bg-slate-600'
+                        }`}
+                      />
+                      <span className="text-[10px] font-mono font-medium truncate max-w-[65px]">
+                        {item.date ? item.date.slice(5) : `Pass ${idx + 1}`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Active Milestone Card */}
+                {timeline[selectedTimelineIdx] && (
+                  <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 text-xs flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Satellite className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <div className="truncate">
+                        <span className="font-semibold text-slate-200 mr-2">
+                          {timeline[selectedTimelineIdx].platform} ({timeline[selectedTimelineIdx].sensorType})
+                        </span>
+                        <span className="text-slate-400 text-[11px]">
+                          {timeline[selectedTimelineIdx].summary}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 shrink-0">
+                      {timeline[selectedTimelineIdx].date}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Column: Grounded Q&A Answer, 4-Tier Reasoner, Objects & Land Cover (5 Cols) */}
@@ -712,6 +781,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-white flex items-center gap-1.5">
                         {obj.objectClass === 'HEAVY_TRUCK_FLEET' && <Truck className="w-3.5 h-3.5 text-cyan-400" />}
+                        {obj.objectClass === 'MARITIME_VESSEL' && <Ship className="w-3.5 h-3.5 text-cyan-400" />}
                         {obj.objectClass === 'BUILDING_STRUCTURE' && <Building className="w-3.5 h-3.5 text-purple-400" />}
                         {obj.objectClass === 'WATER_RESERVOIR' && <Droplets className="w-3.5 h-3.5 text-cyan-400" />}
                         {obj.objectClass === 'UNRESOLVABLE_SUBPIXEL' && <HelpCircle className="w-3.5 h-3.5 text-amber-400" />}
@@ -728,6 +798,20 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                       <span className="text-[10px] text-amber-400 italic">
                         ⚠️ {obj.technicalLimitationNotice}
                       </span>
+                    )}
+                    {obj.objectClass === 'MARITIME_VESSEL' && (
+                      <div className="pt-2 flex items-center justify-between border-t border-slate-800/80 mt-1">
+                        <span className="text-[10px] text-cyan-400 font-mono">
+                          {obj.vesselMetrics ? `${obj.vesselMetrics.estimatedLengthMeters}m Length • ${obj.vesselMetrics.aspectRatio}:1 Ratio` : '240m Length • 4.6:1 Ratio'}
+                        </span>
+                        <button
+                          onClick={() => setReviewingVessel(obj)}
+                          className="px-2.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold hover:bg-cyan-500/30 transition flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Shield className="w-3 h-3 text-cyan-400" />
+                          <span>Analyst Review</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -746,7 +830,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                 <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
                   <div className="text-[11px] font-bold text-cyan-400 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>[OBSERVED FACTS] (Physical Sensor Facts)</span>
+                    <span>[OBSERVED] Physical Sensor Facts</span>
                   </div>
                   <p className="text-[11px] text-slate-400 pl-5">
                     {result?.evidence?.observed?.[0] ||
@@ -758,7 +842,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                 <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
                   <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5" />
-                    <span>[DETECTED ANOMALIES] (Algorithmic ML)</span>
+                    <span>[DETECTED] Algorithmic ML Findings</span>
                   </div>
                   <p className="text-[11px] text-slate-400 pl-5">
                     {result?.evidence?.detected?.[0] ||
@@ -770,7 +854,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
                 <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
                   <div className="text-[11px] font-bold text-purple-400 flex items-center gap-1.5">
                     <Info className="w-3.5 h-3.5" />
-                    <span>[INFERRED INTERPRETATION] (Strategic Context)</span>
+                    <span>[INFERRED] Contextual Strategic Interpretation</span>
                   </div>
                   <p className="text-[11px] text-slate-400 pl-5">
                     {result?.evidence?.inferred?.[0] ||
@@ -810,6 +894,13 @@ export const SatelliteIntelligenceHub: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Interactive Ground-Truth Review & SHA-256 Certification Modal */}
+      <GroundTruthReviewModal
+        isOpen={Boolean(reviewingVessel)}
+        onClose={() => setReviewingVessel(null)}
+        detection={reviewingVessel}
+      />
     </div>
   );
 };

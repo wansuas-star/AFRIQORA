@@ -240,11 +240,12 @@ async function runComprehensiveE2ETestSuite() {
   }
   record('Core-Foundation', 'Prisma Schema Core Models Integrity (22 Models)', allModelsPresent, 'User, BusinessProfile, Wallet, AdCampaign, Satellite models preserved');
 
-  // Check legacy social files are intact and unmodified
-  const feedSectionExists = fs.existsSync(path.join(__dirname, '../frontend/src/components/FeedSection.tsx'));
-  const directMessagingExists = fs.existsSync(path.join(__dirname, '../frontend/src/components/DirectMessaging.tsx'));
-  record('Legacy-Integrity', 'FeedSection.tsx Preserved Untouched', feedSectionExists, 'File intact in frontend/src/components');
-  record('Legacy-Integrity', 'DirectMessaging.tsx Preserved Untouched', directMessagingExists, 'File intact in frontend/src/components');
+  // Verify core intelligence views preservation and clean social decommissioning
+  const overviewExists = fs.existsSync(path.join(__dirname, '../frontend/src/components/OverviewView.tsx'));
+  const searchViewExists = fs.existsSync(path.join(__dirname, '../frontend/src/components/SearchView.tsx'));
+  const socialDecommissioned = !fs.existsSync(path.join(__dirname, '../frontend/src/components/FeedSection.tsx'));
+  record('Platform-Integrity', 'OverviewView.tsx and Core Views Preserved', overviewExists && searchViewExists, 'Core views intact in frontend/src/components');
+  record('Platform-Integrity', 'Social Media Decommissioning Formally Verified', socialDecommissioned, 'Retired social media confirmed absent per space platform pivot');
 
   // -------------------------------------------------------------------------
   // FINAL SCORE & SUMMARY

@@ -1,4 +1,5 @@
 import { AnalysisIntent, GeoBoundingBox } from '../types';
+import { AfricanMaritimeRegistry } from '../maritimeRegistry';
 
 export interface ParsedUserQuery {
   targetLocation: string;
@@ -77,11 +78,29 @@ export class NaturalLanguageQueryParser {
       }
     }
 
+    if (!targetSiteId) {
+      const maritimeMatch = AfricanMaritimeRegistry.searchPorts({ query: q, limit: 1 });
+      if (maritimeMatch && maritimeMatch.length > 0) {
+        const port = maritimeMatch[0];
+        targetLocation = `${port.name}, ${port.country}`;
+        targetBbox = overrideBbox || port.bbox;
+        targetSiteId = port.id;
+      }
+    }
+
     // 2. Resolve Time Window
     let durationDays = 30;
     let timeWindowDescription = 'Last 30 Days';
 
-    if (q.includes('90 days') || q.includes('3 months') || q.includes('quarter')) {
+    const monthRegex = /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi;
+    const monthsFound = query.match(monthRegex);
+
+    if (monthsFound && monthsFound.length >= 2) {
+      const m1 = monthsFound[0].charAt(0).toUpperCase() + monthsFound[0].slice(1).toLowerCase();
+      const m2 = monthsFound[1].charAt(0).toUpperCase() + monthsFound[1].slice(1).toLowerCase();
+      timeWindowDescription = `Comparison between ${m1} and ${m2}`;
+      durationDays = 150;
+    } else if (q.includes('90 days') || q.includes('3 months') || q.includes('quarter')) {
       durationDays = 90;
       timeWindowDescription = 'Last 3 Months (90 Days)';
     } else if (q.includes('6 months') || q.includes('half year') || q.includes('180 days')) {
@@ -117,7 +136,19 @@ export class NaturalLanguageQueryParser {
     } else if (q.includes('people') || q.includes('person') || q.includes('car') || q.includes('license') || q.includes('cannot establish')) {
       analysisIntent = 'image_understanding';
       questionCategory = 'limitations';
-    } else if (q.includes('port') || q.includes('ship') || q.includes('vessel') || q.includes('maritime')) {
+    } else if (
+      q.includes('port') ||
+      q.includes('ship') ||
+      q.includes('vessel') ||
+      q.includes('maritime') ||
+      q.includes('harbor') ||
+      q.includes('harbour') ||
+      q.includes('anchorage') ||
+      q.includes('berth') ||
+      q.includes('canal') ||
+      q.includes('strait') ||
+      (targetSiteId && AfricanMaritimeRegistry.getPortById(targetSiteId) !== undefined)
+    ) {
       analysisIntent = 'port_vessel_activity';
       questionCategory = 'objects';
     } else if (q.includes('mine') || q.includes('pit') || q.includes('expansion') || q.includes('excavation')) {

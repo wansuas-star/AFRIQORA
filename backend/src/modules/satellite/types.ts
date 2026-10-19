@@ -119,6 +119,8 @@ export interface DetectedObject {
   validationRequirements?: string;
   technicalLimitationNotice?: string;
   description: string;
+  vesselMetrics?: VesselPhysicalMetrics;
+  groundTruthVerification?: GroundTruthVerificationRecord;
 }
 
 export interface LandCoverBreakdown {
@@ -288,4 +290,220 @@ export interface UnifiedEarthObservationResult {
   imageUnderstanding?: ImageUnderstandingResult;
   detectedObjects?: DetectedObject[];
   timeSeries?: TimeSeriesAnalysisResult;
+}
+
+export type VesselClassEstimate =
+  | 'CONTAINER_CARGO_VESSEL'
+  | 'BULK_CARRIER_TANKER'
+  | 'OFFSHORE_SUPPLY_TUG'
+  | 'COASTAL_FISHING_CRAFT'
+  | 'UNRESOLVED_RADAR_TARGET';
+
+export interface VesselPhysicalMetrics {
+  estimatedLengthMeters: number;
+  estimatedBeamMeters: number;
+  aspectRatio: number; // Length / Beam
+  radarBackscatterDb: number; // Peak backscatter in dB
+  meanClutterFloorDb: number; // Local sea clutter level in dB
+  targetToClutterRatioDb: number; // TCR = Peak - Clutter
+  estimatedRcsDbsm: number; // Estimated Radar Cross Section in dBsm
+  vesselClassEstimate: VesselClassEstimate;
+  waterMaskConfirmed: boolean;
+  pixelSpan: { rows: number; cols: number };
+}
+
+export type VesselValidationGrade =
+  | 'VALIDATED_HIGH_CONFIDENCE'
+  | 'VALIDATED_PROBABLE'
+  | 'REJECTED_FALSE_ALARM'
+  | 'REJECTED_LAND_INTERFERENCE'
+  | 'UNRESOLVABLE_AT_CURRENT_GSD';
+
+export interface VesselAnnotationCandidate {
+  annotationId: string;
+  sourceSceneId: string;
+  sensorPlatform: 'Sentinel-1A' | 'Sentinel-1B' | 'Commercial-SAR';
+  polarization: 'VV' | 'VH' | 'VV+VH';
+  bbox: GeoBoundingBox;
+  radarBackscatterDb: number;
+  estimatedLengthMeters: number;
+  estimatedBeamMeters?: number;
+  aspectRatio?: number;
+  annotatorType: 'ALGORITHM_CFAR' | 'HUMAN_EXPERT' | 'EXTERNAL_AIS_CORRELATION';
+  waterMaskConfirmed?: boolean;
+  localClutterDb?: number; // Optional measured sea-state clutter level
+}
+
+export interface VesselAnnotationValidationResult {
+  annotationId: string;
+  isValid: boolean;
+  validationGrade: VesselValidationGrade;
+  vesselClassEstimate: VesselClassEstimate;
+  targetToClutterRatioDb: number;
+  aspectRatio: number;
+  qualityScore: number; // 0.0 to 1.0
+  validationNotice: string;
+  provenance: {
+    sceneId: string;
+    platform: string;
+    polarization: string;
+    calibrationStandard: string;
+    speckleFilter: string;
+    licensing: string;
+    timestamp: string;
+  };
+  groundTruthVerification?: GroundTruthVerificationRecord;
+}
+
+export type GroundTruthStatus =
+  | 'CONFIRMED_BY_GEOSPATIAL_ANALYST'
+  | 'AIS_CROSS_VALIDATED'
+  | 'AUTOMATED_ALGORITHMIC_PREDICTION'
+  | 'FLAGGED_FOR_HUMAN_REVIEW'
+  | 'REJECTED_FALSE_ALARM';
+
+export interface GroundTruthVerificationRecord {
+  status: GroundTruthStatus;
+  analystVerification?: {
+    analystId: string;
+    analystName: string;
+    reviewDate: string;
+    confidenceRating: number; // 0.0 to 1.0
+    notes: string;
+    signatureHash: string;
+  };
+  aisCrossValidation?: {
+    mmsi: string;
+    vesselName: string;
+    imo?: string;
+    callsign?: string;
+    reportedSpeedKnots: number;
+    destination?: string;
+    crossCheckConfidence: number; // 0.0 to 1.0
+    timeDeltaMinutes: number;
+  };
+}
+
+export interface HumanGroundTruthReviewSubmission {
+  detectionId: string;
+  analystId: string;
+  analystName: string;
+  decision: 'CONFIRM' | 'REJECT' | 'NEEDS_ADDITIONAL_SATELLITE_PASS';
+  confidenceRating: number; // 0.0 to 1.0
+  notes: string;
+  aisCrossChecked?: boolean;
+  aisMmsi?: string;
+  aisVesselName?: string;
+}
+
+export interface DatasetProvenanceAudit {
+  datasetId: string;
+  sensorPipeline: 'SENTINEL_1_SAR' | 'SENTINEL_2_OPTICAL';
+  sceneIds: string[];
+  actualAcquisitionDates: string[];
+  orbitPass?: 'ASCENDING' | 'DESCENDING';
+  polarizationOrBands: string[];
+  radiometricStandard: string;
+  speckleFilterOrAtmosphericCorrection: string;
+  pixelGridSpacingMeters: number;
+  trueGroundSamplingDistanceMeters: number;
+  dataPolicyAttribution: string;
+  integrityHashSha256: string;
+}
+
+
+export type AfricanMaritimeRegion =
+  | 'NORTH_AFRICA'
+  | 'WEST_AFRICA'
+  | 'CENTRAL_AFRICA_GULF_OF_GUINEA'
+  | 'EAST_AFRICA_HORN'
+  | 'SOUTHERN_AFRICA'
+  | 'INDIAN_OCEAN_ISLANDS'
+  | 'INLAND_WATERWAYS';
+
+export type HarborType =
+  | 'COASTAL_NATURAL'
+  | 'COASTAL_BREAKWATER'
+  | 'ESTUARY_RIVER'
+  | 'OPEN_ANCHORAGE'
+  | 'INLAND_FRESHWATER';
+
+export type PortCategory =
+  | 'MAJOR_CONTAINER_PORT'
+  | 'BULK_COMMODITY_PORT'
+  | 'ENERGY_OIL_TERMINAL'
+  | 'STRATEGIC_STRAIT_CHOKEPOINT'
+  | 'COASTAL_FISHING_ZONE'
+  | 'INLAND_LAKE_PORT';
+
+export type DataIntegrityClassification =
+  | 'LIVE_COPERNICUS_DOWNLOAD'
+  | 'DISCOVERED_CATALOGUE_AWAITING_DOWNLOAD'
+  | 'CALIBRATED_BENCHMARK_REFERENCE'
+  | 'AWAITING_ORBIT_PASS';
+
+export interface AfricanPortRegistryEntry {
+  id: string;
+  name: string;
+  city?: string;
+  country: string;
+  region: AfricanMaritimeRegion;
+  category: PortCategory;
+  harborType: HarborType;
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
+  bbox: GeoBoundingBox;
+  strategicSignificance: string;
+  shippingCorridor?: string;
+  coverage: {
+    sarCoverage: boolean;
+    opticalCoverage: boolean;
+    recommendedBand: string;
+    defaultObservationMode: 'SAR_C_BAND' | 'OPTICAL_MSI';
+  };
+  operationalStatus: 'OPERATIONAL_LIVE' | 'CALIBRATED_BENCHMARK' | 'AWAITING_PASS';
+  typicalVesselTypes?: string[];
+}
+
+export interface MaritimeCoverageReport {
+  portId?: string;
+  portName?: string;
+  country?: string;
+  region?: AfricanMaritimeRegion;
+  bbox: GeoBoundingBox;
+  observationDate: string;
+  dataIntegrity: DataIntegrityClassification;
+  isSimulatedBenchmark: boolean;
+  integrityNotice: string;
+  availableSatellites: {
+    platform: SatellitePlatform;
+    sensorType: SensorType;
+    status: 'ACTIVE_ORBIT' | 'DISCOVERED_SCENE' | 'CALIBRATED_GRID';
+    lastPassDate?: string;
+    nextExpectedPassHours?: number;
+    resolutionMeters: number;
+  }[];
+  discoveredScenes?: {
+    sceneId: string;
+    platform: string;
+    acquisitionDate: string;
+    cloudCoverPercent?: number;
+    orbitDirection?: 'ASCENDING' | 'DESCENDING';
+    downloadAvailable: boolean;
+  }[];
+  vesselSummary: {
+    count: number;
+    vessels: Array<{
+      id: string;
+      bbox: GeoBoundingBox;
+      metrics: VesselPhysicalMetrics;
+      confidence: number;
+      isBenchmarkReference: boolean;
+    }>;
+    seaClutterMeanDb: number;
+    waterCoverageRatio: number;
+  };
+  provenance: DatasetProvenanceAudit;
 }

@@ -17,4 +17,15 @@ router.get('/change/presets', SatelliteController.getChangePresets);
 router.post('/change/analyze', SatelliteController.analyzeChange);
 router.get('/change/analyze', SatelliteController.analyzeChange);
 
+// Continental African Maritime & Port Registry
+router.get('/maritime/regions', SatelliteController.getMaritimeRegions);
+router.get('/maritime/ports', SatelliteController.getMaritimePorts);
+router.get('/maritime/ports/:id', SatelliteController.getMaritimePortById);
+router.post('/maritime/ports/custom', SatelliteController.registerCustomPortAOI);
+
+// ML-01 Maritime Vessel Annotation Validation & Ground-Truth Verification
+router.get('/vessels', SatelliteController.getVesselDetections);
+router.post('/vessels/validate', SatelliteController.validateVesselAnnotation);
+router.post('/ground-truth/review', SatelliteController.submitGroundTruthReview);
+
 export default router;

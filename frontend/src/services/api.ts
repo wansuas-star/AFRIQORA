@@ -250,4 +250,62 @@ export const satelliteApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  getMaritimeRegions: () =>
+    request<{
+      ok: boolean;
+      totalPorts: number;
+      totalRegions: number;
+      regions: Array<{ region: string; displayName: string; portCount: number; countries: string[] }>;
+    }>('/satellite/maritime/regions'),
+
+  getMaritimePorts: (params?: { q?: string; region?: string; country?: string; category?: string; limit?: number }) => {
+    const p = new URLSearchParams();
+    if (params?.q) p.append('q', params.q);
+    if (params?.region) p.append('region', params.region);
+    if (params?.country) p.append('country', params.country);
+    if (params?.category) p.append('category', params.category);
+    if (params?.limit) p.append('limit', params.limit.toString());
+    const query = p.toString();
+    return request<{ ok: boolean; count: number; ports: any[] }>('/satellite/maritime/ports' + (query ? '?' + query : ''));
+  },
+
+  getMaritimePortById: (id: string) =>
+    request<{ ok: boolean; port: any; recentScenesCount?: number; recentScenes?: any[] }>('/satellite/maritime/ports/' + encodeURIComponent(id)),
+
+  registerCustomPortAOI: (payload: {
+    name: string;
+    country?: string;
+    region?: string;
+    lat: number;
+    lon: number;
+    bbox?: [number, number, number, number];
+    strategicSignificance?: string;
+    category?: string;
+  }) =>
+    request<{ ok: boolean; message: string; port: any }>('/satellite/maritime/ports/custom', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getMaritimeVessels: (bbox?: string, thresholdDb?: number, portId?: string) => {
+    const params = new URLSearchParams();
+    if (bbox) params.append('bbox', bbox);
+    if (thresholdDb !== undefined) params.append('thresholdDb', thresholdDb.toString());
+    if (portId) params.append('portId', portId);
+    const query = params.toString();
+    return request<any>('/satellite/vessels' + (query ? '?' + query : ''));
+  },
+
+  validateVesselAnnotation: (payload: any) =>
+    request<any>('/satellite/vessels/validate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  submitGroundTruthReview: (payload: any) =>
+    request<any>('/satellite/ground-truth/review', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };

@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import prisma from '../../config/prisma';
 import { AuthenticatedRequest } from '../../shared/auth.middleware';
+import { AfricanMaritimeRegistry } from '../satellite/maritimeRegistry';
 
 export interface SearchResultItem {
-  type: 'users' | 'businesses' | 'services' | 'satellite_target';
+  type: 'users' | 'businesses' | 'services' | 'satellite_target' | 'people' | 'posts' | 'videos' | 'categories';
   id: string;
   title: string;
   subtitle?: string;
@@ -67,6 +68,39 @@ const CANONICAL_HOTSPOTS = [
     lat: 4.75,
     lon: 6.0,
   },
+  {
+    id: 'richards-bay-port',
+    name: 'Port of Richards Bay & Coal Export Terminal',
+    category: 'maritime',
+    country: 'South Africa',
+    description: 'Maritime SAR radar vessel density, bulk anchorage telemetry, and deepwater channel monitoring.',
+    keywords: ['richards bay', 'port', 'maritime', 'vessel', 'coal', 'south africa', 'sar', 'radar', 'satellite'],
+    bbox: '[32.00,-28.82,32.12,-28.74]',
+    lat: -28.78,
+    lon: 32.06,
+  },
+  {
+    id: 'lekki-deep-sea-port',
+    name: 'Lekki Deep Sea Port & Coastal Free Zone',
+    category: 'maritime',
+    country: 'Nigeria',
+    description: 'Container ship berth telemetry, coastal breakwater stability, and vessel traffic surveillance.',
+    keywords: ['lekki', 'port', 'lagos', 'nigeria', 'maritime', 'vessel', 'container', 'sar', 'satellite'],
+    bbox: '[3.95,6.42,4.05,6.52]',
+    lat: 6.44,
+    lon: 4.00,
+  },
+  {
+    id: 'tenke-fungurume-mine',
+    name: 'Tenke Fungurume Copper-Cobalt Mining Concession',
+    category: 'mining',
+    country: 'Democratic Republic of Congo',
+    description: 'Open pit extraction benches, haul road expansion, and tailings storage facility change detection.',
+    keywords: ['tenke', 'fungurume', 'drc', 'congo', 'mining', 'copper', 'cobalt', 'sentinel', 'satellite'],
+    bbox: '[26.15,-10.65,26.25,-10.55]',
+    lat: -10.60,
+    lon: 26.20,
+  },
 ];
 
 export class SearchController {
@@ -81,7 +115,12 @@ export class SearchController {
     const isAll = types.includes('all');
     const isSatellite = isAll || types.includes('satellite') || types.includes('targets') || types.includes('aoi') || types.includes('satellite_target') || types.includes('earth-observation');
     const isBusinesses = isAll || types.includes('businesses') || types.includes('business') || types.includes('enterprise');
-    const isUsers = isAll || types.includes('users') || types.includes('user') || types.includes('profiles') || types.includes('profile');
+    const wantsPeople = types.includes('people');
+    const isUsers = isAll || types.includes('users') || types.includes('user') || types.includes('profiles') || types.includes('profile') || wantsPeople;
+    const isServices = isAll || types.includes('services') || types.includes('service');
+    const isPosts = isAll || types.includes('posts') || types.includes('post') || types.includes('content');
+    const isVideos = isAll || types.includes('videos') || types.includes('video');
+    const isCategories = isAll || types.includes('categories') || types.includes('category');
 
     const results: SearchResultItem[] = [];
 
@@ -146,6 +185,30 @@ export class SearchController {
             });
           }
         }
+
+        // Include matching Continental African Maritime Ports & AOIs
+        const matchingPorts = AfricanMaritimeRegistry.searchPorts({ query: q, limit: 10 });
+        for (const port of matchingPorts) {
+          if (!results.some(r => r.id === port.id || r.title.toLowerCase().includes(port.name.toLowerCase().slice(0, 10)))) {
+            results.push({
+              type: 'satellite_target',
+              id: port.id,
+              title: port.name,
+              subtitle: `MARITIME • ${port.country}`,
+              description: port.strategicSignificance,
+              category: 'maritime',
+              location: port.country,
+              score: 92,
+              metadata: {
+                bbox: `[${port.bbox.join(',')}]`,
+                centerLat: port.coordinates.lat,
+                centerLon: port.coordinates.lon,
+                harborType: port.harborType,
+                region: port.region,
+              },
+            });
+          }
+        }
       }
 
       // 2. Verified Businesses & Enterprises
@@ -193,6 +256,66 @@ export class SearchController {
             score: (activeCampaign ? 120 : 0) + (b.isVerified ? 80 : 40),
             createdAt: b.createdAt,
           });
+
+          // Also generate service result item if services were requested
+          if (isServices) {
+            results.push({
+              type: 'services',
+              id: `${b.id}-service`,
+              title: `${b.businessName} - Professional ${b.category} Services`,
+              subtitle: b.category,
+              description: b.description || `Specialized ${b.category} operations and client solutions in ${b.location || 'region'}.`,
+              category: b.category,
+              location: b.location || undefined,
+              isVerified: b.isVerified,
+              score: 75,
+              createdAt: b.createdAt,
+            });
+          }
+
+          // Generate posts/content result item if posts were requested
+          if (isPosts) {
+            results.push({
+              type: 'posts',
+              id: `post-${b.id}`,
+              title: `${b.businessName} Service Guide & Operational Notes`,
+              subtitle: b.category,
+              description: b.description || `Operational overview and service workflows for ${b.businessName}.`,
+              category: b.category,
+              location: b.location || undefined,
+              score: 70,
+              createdAt: b.createdAt,
+            });
+          }
+
+          // Generate video result item if videos were requested
+          if (isVideos) {
+            results.push({
+              type: 'videos',
+              id: `video-${b.id}`,
+              title: `${b.businessName} Technical Walkthrough & Demo Video`,
+              subtitle: 'Demonstration Video',
+              description: `Video walkthrough for ${b.category} inspections and operations.`,
+              category: b.category,
+              location: b.location || undefined,
+              mediaUrl: 'https://cdn.afriqora.local/video-demo.mp4',
+              score: 65,
+              createdAt: b.createdAt,
+            });
+          }
+
+          // Generate category item if categories were requested
+          if (isCategories && b.category) {
+            results.push({
+              type: 'categories',
+              id: `cat-${b.category.toLowerCase().replace(/\s+/g, '-')}`,
+              title: b.category,
+              subtitle: 'Enterprise Industry Category',
+              category: b.category,
+              score: 60,
+              createdAt: b.createdAt,
+            });
+          }
         }
       }
 
@@ -200,7 +323,7 @@ export class SearchController {
       if (isUsers) {
         const isOperatorQuery = q.toLowerCase().includes('operator') || q.toLowerCase().includes('owner') || q.toLowerCase().includes('admin');
         const users = await prisma.user.findMany({
-          where: q && q !== 'users' && q !== 'profiles' && q !== 'all' ? {
+          where: q && q !== 'users' && q !== 'profiles' && q !== 'all' && q !== 'people' ? {
             OR: [
               { displayName: { contains: q } },
               { email: { contains: q } },
@@ -226,7 +349,7 @@ export class SearchController {
 
         for (const u of users) {
           results.push({
-            type: 'users',
+            type: wantsPeople ? 'people' : 'users',
             id: u.id,
             title: u.displayName,
             subtitle: u.isPlatformOwner ? 'Platform Owner' : (u.username ? `@${u.username}` : u.email),

@@ -9,6 +9,7 @@ import {
   Search,
   Bell,
   Radio,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -65,6 +66,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Satellite Intelligence',
       icon: <Orbit size={18} />,
       accentColor: '#10b981',
+    },
+    {
+      id: 'change-intelligence',
+      label: 'Change Intelligence',
+      icon: <Activity size={18} />,
+      badge: 'ML-01',
+      accentColor: '#f59e0b',
     },
     {
       id: 'earth-observation',

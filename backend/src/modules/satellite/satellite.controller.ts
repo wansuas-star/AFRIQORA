@@ -8,7 +8,16 @@ import { ImageUnderstandingEngine } from './ml/imageUnderstanding';
 import { CopernicusCDSEProvider } from './providers/copernicus.provider';
 import { STACProvider } from './providers/stac.provider';
 import { CommercialSatelliteProvider } from './providers/commercial.provider';
-import { GeoBoundingBox } from './types';
+import { VesselValidationEngine } from './ml/vesselValidation';
+import {
+  GeoBoundingBox,
+  VesselAnnotationCandidate,
+  HumanGroundTruthReviewSubmission,
+  AfricanMaritimeRegion,
+  PortCategory,
+  DataIntegrityClassification,
+} from './types';
+import { AfricanMaritimeRegistry } from './maritimeRegistry';
 
 const prisma = new PrismaClient();
 
@@ -981,4 +990,292 @@ export class SatelliteController {
     }
   }
 
+  /**
+   * ML-01: Validate maritime vessel candidate annotation against radar cross-section and geometry
+   */
+  public static async validateVesselAnnotation(req: Request, res: Response): Promise<void> {
+    try {
+      const candidate: VesselAnnotationCandidate = req.body;
+      if (!candidate || !candidate.annotationId || !candidate.radarBackscatterDb || !candidate.estimatedLengthMeters) {
+        res.status(400).json({
+          ok: false,
+          error: 'Missing required candidate annotation fields (annotationId, radarBackscatterDb, estimatedLengthMeters).',
+        });
+        return;
+      }
+
+      const result = VesselValidationEngine.validateAnnotation(candidate);
+      res.json({ ok: true, validation: result });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  /**
+   * ML-01: Submit human-expert geospatial analyst ground-truth quality review
+   */
+  public static async submitGroundTruthReview(req: Request, res: Response): Promise<void> {
+    try {
+      const submission: HumanGroundTruthReviewSubmission = req.body;
+      if (!submission || !submission.detectionId || !submission.analystId || !submission.decision) {
+        res.status(400).json({
+          ok: false,
+          error: 'Missing required review fields (detectionId, analystId, decision).',
+        });
+        return;
+      }
+
+      const certified = VesselValidationEngine.verifyGroundTruth(submission);
+      res.json({
+        ok: true,
+        detectionId: submission.detectionId,
+        groundTruth: certified,
+        message: `Ground-truth review certified by analyst ${submission.analystName || submission.analystId} (${certified.status}).`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  /**
+   * Continental African Maritime Intelligence: List all African coastal regions and port counts
+   */
+  public static async getMaritimeRegions(req: Request, res: Response): Promise<void> {
+    try {
+      const summary = AfricanMaritimeRegistry.getRegionsSummary();
+      const totalPorts = AfricanMaritimeRegistry.getAllPorts().length;
+      res.json({
+        ok: true,
+        totalPorts,
+        totalRegions: summary.length,
+        regions: summary,
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  /**
+   * Continental African Maritime Intelligence: Search & filter African ports and coastal AOIs
+   */
+  public static async getMaritimePorts(req: Request, res: Response): Promise<void> {
+    try {
+      const { q, query, region, country, category, limit } = req.query;
+      const searchTerm = typeof q === 'string' ? q : (typeof query === 'string' ? query : undefined);
+      const parsedLimit = limit ? parseInt(String(limit), 10) : 100;
+
+      const ports = AfricanMaritimeRegistry.searchPorts({
+        query: searchTerm,
+        region: region as AfricanMaritimeRegion,
+        country: typeof country === 'string' ? country : undefined,
+        category: category as PortCategory,
+        limit: isNaN(parsedLimit) ? 100 : parsedLimit,
+      });
+
+      res.json({
+        ok: true,
+        count: ports.length,
+        ports,
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  /**
+   * Continental African Maritime Intelligence: Retrieve single port metadata & satellite sensor status
+   */
+  public static async getMaritimePortById(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const port = AfricanMaritimeRegistry.getPortById(id);
+
+      if (!port) {
+        res.status(404).json({ ok: false, error: `Port or AOI '${id}' not found in African Maritime Registry.` });
+        return;
+      }
+
+      // Check Copernicus CDSE OData catalogue for recent Sentinel-1 SAR passes over this port
+      const end = new Date();
+      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      let discoveredScenes: any[] = [];
+      try {
+        discoveredScenes = await SatelliteController.copernicus.searchScenes(port.bbox, { start, end }, 'Sentinel-1A');
+      } catch {
+        // Fallback gracefully if network/offline
+      }
+
+      res.json({
+        ok: true,
+        port,
+        recentScenesCount: discoveredScenes.length,
+        recentScenes: discoveredScenes.slice(0, 5),
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  /**
+   * Continental African Maritime Intelligence: Register a custom coastal or inland AOI dynamically
+   */
+  public static async registerCustomPortAOI(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, country, region, lat, lon, bbox, strategicSignificance, category } = req.body;
+      if (!name || typeof lat !== 'number' || typeof lon !== 'number') {
+        res.status(400).json({
+          ok: false,
+          error: 'Required fields missing: name, lat (number), lon (number).',
+        });
+        return;
+      }
+
+      const registered = AfricanMaritimeRegistry.registerCustomAOI({
+        name,
+        country,
+        region,
+        lat,
+        lon,
+        bbox,
+        strategicSignificance,
+        category,
+      });
+
+      res.status(201).json({
+        ok: true,
+        message: `Custom maritime AOI '${registered.name}' registered successfully.`,
+        port: registered,
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+
+  /**
+   * ML-01: Retrieve maritime vessel detections for specified AOI with CFAR radar backscatter and provenance
+   */
+  public static async getVesselDetections(req: Request, res: Response): Promise<void> {
+    try {
+      const { bbox: rawBbox, portId, thresholdDb } = req.query;
+      const portIdStr = typeof portId === 'string' ? (portId as string) : undefined;
+      let targetPort = portIdStr ? AfricanMaritimeRegistry.getPortById(portIdStr) : undefined;
+      let bbox: GeoBoundingBox = targetPort ? targetPort.bbox : [32.00, -28.82, 32.12, -28.74]; // Default Richards Bay
+
+      if (rawBbox && typeof rawBbox === 'string') {
+        const parts = rawBbox.split(',').map(Number);
+        if (parts.length === 4 && !parts.some(isNaN)) {
+          bbox = [parts[0], parts[1], parts[2], parts[3]];
+          if (!targetPort) {
+            targetPort = AfricanMaritimeRegistry.findPortByBbox(bbox);
+          }
+        }
+      }
+
+      const isLekki = targetPort ? targetPort.id === 'lekki-deep-sea' : (bbox[0] < 10 && bbox[1] > 0);
+      const sceneIdPrefix = targetPort
+        ? `S1A_IW_${targetPort.id.toUpperCase().replace(/-/g, '_')}_CURRENT`
+        : (isLekki ? 'S1A_IW_LEKKI_MARITIME_CURRENT' : 'S1A_IW_RICHARDSBAY_MARITIME_CURRENT');
+
+      const sarScene = await SatelliteController.copernicus.fetchSARScene(sceneIdPrefix, bbox, targetPort);
+      const parsedThreshold = thresholdDb ? parseFloat(String(thresholdDb)) : -7.0;
+
+      const detectionResult = VesselValidationEngine.detectVesselsFromSAR({
+        sarScene,
+        bbox,
+        vesselPeakThresholdDb: parsedThreshold,
+      });
+
+      // Try discovering actual Sentinel-1 scenes from Copernicus CDSE catalogue over the last 30 days
+      let discoveredScenes: any[] = [];
+      try {
+        const end = new Date();
+        const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        discoveredScenes = await SatelliteController.copernicus.searchScenes(bbox, { start, end }, 'Sentinel-1A');
+      } catch {
+        // Fallback gracefully
+      }
+
+      const isLive = Boolean(sarScene.isRealData);
+      const dataIntegrity: DataIntegrityClassification = isLive
+        ? 'LIVE_COPERNICUS_DOWNLOAD'
+        : (discoveredScenes.length > 0 ? 'DISCOVERED_CATALOGUE_AWAITING_DOWNLOAD' : 'CALIBRATED_BENCHMARK_REFERENCE');
+
+      const integrityNotice = isLive
+        ? 'CONFIRMED SATELLITE MEASUREMENT: Derived from processed Copernicus Sentinel-1 SAR IW GRDH C-Band data.'
+        : discoveredScenes.length > 0
+        ? `DISCOVERED SATELLITE SCENES (${discoveredScenes.length} ESA CDSE passes found): Current radar grid is benchmark reference test data. Real-time product download awaiting configured CDSE OAuth2 credentials.`
+        : 'CALIBRATED BENCHMARK REFERENCE: Simulated radar target for algorithmic calibration. Not a confirmed real-world vessel detection.';
+
+      // Strictly tag detections so simulated data is NEVER labeled as confirmed real-world vessels
+      const annotatedVessels = detectionResult.vessels.map((v) => ({
+        ...v,
+        isBenchmarkReference: !isLive,
+        validationNotice: isLive
+          ? 'Confirmed radar metallic double-bounce return from live satellite scene.'
+          : 'Calibrated reference vessel signature for algorithmic testing and ground-truth audit.',
+      }));
+
+      const provenanceAudit = VesselValidationEngine.createDatasetProvenanceAudit({
+        datasetId: `DS_SAR_MARITIME_${targetPort ? targetPort.id.toUpperCase() : 'AOI'}_${Date.now()}`,
+        sensorPipeline: 'SENTINEL_1_SAR',
+        sceneIds: discoveredScenes.length > 0 ? [discoveredScenes[0].id, sarScene.sceneId] : [sarScene.sceneId],
+        actualAcquisitionDates: discoveredScenes.length > 0
+          ? [discoveredScenes[0].acquisitionDate.toISOString().slice(0, 10)]
+          : [sarScene.acquisitionDate.toISOString().slice(0, 10)],
+        polarizationOrBands: [sarScene.polarization],
+        radiometricStandard: 'ESA_SAR_RADIOMETRIC_CAL_V2',
+        speckleFilterOrAtmosphericCorrection: 'Lee_3x3_Cu_0.5227',
+        pixelGridSpacingMeters: sarScene.resolutionMeters || 10.0,
+        trueGroundSamplingDistanceMeters: 20.0,
+      });
+
+      res.json({
+        ok: true,
+        portId: targetPort ? targetPort.id : undefined,
+        portName: targetPort ? targetPort.name : undefined,
+        country: targetPort ? targetPort.country : undefined,
+        region: targetPort ? targetPort.region : undefined,
+        category: targetPort ? targetPort.category : undefined,
+        harborType: targetPort ? targetPort.harborType : undefined,
+        strategicSignificance: targetPort ? targetPort.strategicSignificance : undefined,
+        shippingCorridor: targetPort ? targetPort.shippingCorridor : undefined,
+        operationalStatus: targetPort ? targetPort.operationalStatus : undefined,
+        bbox,
+        observationDate: sarScene.acquisitionDate.toISOString(),
+        dataIntegrity,
+        isSimulatedBenchmark: !isLive,
+        integrityNotice,
+        availableSatellites: [
+          {
+            platform: 'Sentinel-1A',
+            sensorType: 'SAR_C_BAND',
+            status: isLive ? 'ACTIVE_ORBIT' : (discoveredScenes.length > 0 ? 'DISCOVERED_SCENE' : 'CALIBRATED_GRID'),
+            lastPassDate: discoveredScenes.length > 0 ? discoveredScenes[0].acquisitionDate.toISOString() : sarScene.acquisitionDate.toISOString(),
+            resolutionMeters: 10.0,
+          },
+          {
+            platform: 'Sentinel-2A',
+            sensorType: 'OPTICAL_MSI',
+            status: 'ACTIVE_ORBIT',
+            resolutionMeters: 10.0,
+          },
+        ],
+        discoveredScenes: discoveredScenes.map((s) => ({
+          sceneId: s.id,
+          platform: s.platform,
+          acquisitionDate: s.acquisitionDate.toISOString(),
+          cloudCoverPercent: s.cloudCover,
+          orbitDirection: s.orbitDirection,
+          downloadAvailable: isLive,
+        })),
+        vesselCount: annotatedVessels.length,
+        vessels: annotatedVessels,
+        seaClutterMeanDb: detectionResult.clutterMeanDb,
+        waterCoverageRatio: detectionResult.waterPixelRatio,
+        provenance: provenanceAudit,
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
 }

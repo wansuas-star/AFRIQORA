@@ -10,12 +10,14 @@ import {
   Bell,
   Radio,
   Activity,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export type NavTab =
   | 'overview'
   | 'satellite'
+  | 'conflict'
   | 'change-intelligence'
   | 'earth-observation'
   | 'mining'
@@ -66,6 +68,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Satellite Intelligence',
       icon: <Orbit size={18} />,
       accentColor: '#10b981',
+    },
+    {
+      id: 'conflict',
+      label: 'Conflict Intelligence',
+      icon: <Shield size={18} />,
+      badge: 'DRC',
+      accentColor: '#f43f5e',
     },
     {
       id: 'change-intelligence',

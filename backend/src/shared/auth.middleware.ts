@@ -22,11 +22,12 @@ function parseCookies(req: Request): Record<string, string> {
   return out;
 }
 
-function getJwtSecret(): string {
+export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  const isInvalid = !secret || !secret.trim() || secret.includes('CHANGE_ME') || secret.length < 32;
+  if (isInvalid) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production environment');
+      throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing, predictable, or fewer than 32 characters in production environment');
     }
     return 'afriqora_development_isolated_jwt_secret_2026';
   }
@@ -77,6 +78,13 @@ export const attachAuth = async (req: AuthenticatedRequest, _res: Response, next
     const userId = await extractUserId(req);
     if (userId) {
       req.userId = userId;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, isPlatformOwner: true },
+      });
+      if (user) {
+        req.user = user;
+      }
     }
   } catch (e) {}
   next();

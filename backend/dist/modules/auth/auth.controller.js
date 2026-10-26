@@ -7,6 +7,7 @@ exports.login = exports.register = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../../config/prisma"));
+const auth_middleware_1 = require("../../shared/auth.middleware");
 const register = async (req, res) => {
     try {
         const { email, password, displayName } = req.body;
@@ -27,7 +28,7 @@ const register = async (req, res) => {
                 afriqoraId,
             }
         });
-        const jwtSecret = process.env.JWT_SECRET || 'afriqora_development_isolated_jwt_secret_2026';
+        const jwtSecret = (0, auth_middleware_1.getJwtSecret)();
         const token = jsonwebtoken_1.default.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' });
         res.status(201).json({ token, user: { id: user.id, email: user.email, displayName: user.displayName, afriqoraId: user.afriqoraId } });
     }
@@ -48,7 +49,7 @@ const login = async (req, res) => {
         if (!validPassword) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
-        const jwtSecret = process.env.JWT_SECRET || 'afriqora_development_isolated_jwt_secret_2026';
+        const jwtSecret = (0, auth_middleware_1.getJwtSecret)();
         const token = jsonwebtoken_1.default.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, displayName: user.displayName, afriqoraId: user.afriqoraId } });
     }

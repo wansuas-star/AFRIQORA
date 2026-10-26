@@ -309,3 +309,126 @@ export const satelliteApi = {
       body: JSON.stringify(payload),
     }),
 };
+
+// 9. Conflict Intelligence API (Eastern DRC Mining Corridors & Armed Conflict Surveillance)
+export const conflictApi = {
+  getStatus: () =>
+    request<{
+      ok: boolean;
+      module: string;
+      state: {
+        isActive: boolean;
+        activationDate?: string;
+        authorizedByOwnerEmail?: string;
+        authorizationNonce?: string;
+        surveillanceNotice: string;
+        strictOwnerGateEnabled: boolean;
+      };
+      totalIncidentsAvailable: number;
+      provincesMonitored: string[];
+      monitoredMiningCorridors: string[];
+      legalNotice: string;
+    }>('/conflict/status'),
+
+  activate: (authorizationReason?: string) =>
+    request<{
+      ok: boolean;
+      message: string;
+      state: any;
+    }>('/conflict/activate', {
+      method: 'POST',
+      body: JSON.stringify({ authorizationReason }),
+    }),
+
+  deactivate: () =>
+    request<{
+      ok: boolean;
+      message: string;
+      state: any;
+    }>('/conflict/deactivate', {
+      method: 'POST',
+    }),
+
+  getIncidents: (params?: { province?: string; territory?: string; incidentType?: string; severity?: string; query?: string }) => {
+    const p = new URLSearchParams();
+    if (params?.province) p.append('province', params.province);
+    if (params?.territory) p.append('territory', params.territory);
+    if (params?.incidentType) p.append('incidentType', params.incidentType);
+    if (params?.severity) p.append('severity', params.severity);
+    if (params?.query) p.append('query', params.query);
+    const query = p.toString();
+    return request<{
+      ok: boolean;
+      count: number;
+      incidents: any[];
+      moduleState: any;
+      admiraltyScaleLegend: any;
+    }>('/conflict/incidents' + (query ? '?' + query : ''));
+  },
+
+  getIncidentById: (id: string) =>
+    request<{
+      ok: boolean;
+      incident: any;
+      satelliteEvidenceSummary: any;
+    }>('/conflict/incidents/' + encodeURIComponent(id)),
+
+  getSatellitePasses: (id: string, days?: number, platform?: string) => {
+    const p = new URLSearchParams();
+    if (days) p.append('days', days.toString());
+    if (platform) p.append('platform', platform);
+    const query = p.toString();
+    return request<{
+      ok: boolean;
+      incidentId: string;
+      incidentTitle: string;
+      locationName: string;
+      bbox: [number, number, number, number];
+      searchWindow: { start: string; end: string; days: number };
+      provenance: {
+        isRealData: boolean;
+        dataSource: string;
+        provider: string;
+        totalScenesDiscovered: number;
+        sarPassCount: number;
+        opticalPassCount: number;
+      };
+      scenes: any[];
+    }>('/conflict/incidents/' + encodeURIComponent(id) + '/satellite-passes' + (query ? '?' + query : ''));
+  },
+
+  corroborateSatellite: (
+    id: string,
+    payload: {
+      sensorType?: 'SAR' | 'OPTICAL' | 'BOTH';
+      comparisonWindowDays?: number;
+      thresholdDb?: number;
+    }
+  ) =>
+    request<{
+      ok: boolean;
+      incidentId: string;
+      incidentTitle: string;
+      admiraltyUpgradeNotice: string;
+      generatedObservations: any[];
+      incident: any;
+    }>('/conflict/incidents/' + encodeURIComponent(id) + '/corroborate-satellite', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getAuditLogs: () =>
+    request<{
+      ok: boolean;
+      totalEntries: number;
+      logs: Array<{
+        id: string;
+        timestamp: string;
+        actorEmail: string;
+        action: string;
+        targetIncidentId?: string;
+        details: string;
+        sha256Signature: string;
+      }>;
+    }>('/conflict/audit-logs'),
+};

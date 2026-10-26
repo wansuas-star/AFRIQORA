@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireOfficer = exports.requirePlatformOwner = exports.requireAuth = exports.attachAuth = void 0;
+exports.getJwtSecret = getJwtSecret;
 exports.extractUserId = extractUserId;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../config/prisma"));
@@ -24,9 +25,10 @@ function parseCookies(req) {
 }
 function getJwtSecret() {
     const secret = process.env.JWT_SECRET;
-    if (!secret) {
+    const isInvalid = !secret || !secret.trim() || secret.includes('CHANGE_ME') || secret.length < 32;
+    if (isInvalid) {
         if (process.env.NODE_ENV === 'production') {
-            throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production environment');
+            throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing, predictable, or fewer than 32 characters in production environment');
         }
         return 'afriqora_development_isolated_jwt_secret_2026';
     }
@@ -76,6 +78,13 @@ const attachAuth = async (req, _res, next) => {
         const userId = await extractUserId(req);
         if (userId) {
             req.userId = userId;
+            const user = await prisma_1.default.user.findUnique({
+                where: { id: userId },
+                select: { id: true, email: true, isPlatformOwner: true },
+            });
+            if (user) {
+                req.user = user;
+            }
         }
     }
     catch (e) { }

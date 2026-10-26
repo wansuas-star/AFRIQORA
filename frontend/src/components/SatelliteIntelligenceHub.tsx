@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { SpectralLayerControls, SpectralLayerMode } from './satellite/SpectralLayerControls';
 import { GroundTruthReviewModal } from './satellite/GroundTruthReviewModal';
+import { ConflictIntelligenceView } from './satellite/ConflictIntelligenceView';
 
 interface LocationResult {
   name: string;
@@ -173,6 +174,7 @@ export const SatelliteIntelligenceHub: React.FC = () => {
   const [selectedTimelineIdx, setSelectedTimelineIdx] = useState<number>(0);
   const [reviewingVessel, setReviewingVessel] = useState<any | null>(null);
 
+  const [hubSection, setHubSection] = useState<'surveillance' | 'conflict'>('surveillance');
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -388,8 +390,44 @@ export const SatelliteIntelligenceHub: React.FC = () => {
         </div>
       </div>
 
+      {/* Sub-Navigation Switcher: Earth Observation vs Conflict Surveillance */}
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+          <button
+            onClick={() => setHubSection('surveillance')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              hubSection === 'surveillance'
+                ? 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-950/20'
+                : 'bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Satellite className="w-4 h-4 text-cyan-400" />
+            <span>Earth Observation & Maritime Surveillance</span>
+          </button>
+
+          <button
+            onClick={() => setHubSection('conflict')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              hubSection === 'conflict'
+                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-md shadow-amber-950/20'
+                : 'bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Shield className="w-4 h-4 text-amber-400" />
+            <span>Eastern DRC Armed Conflict & Mining Corridors</span>
+            <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Gated
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
+        {hubSection === 'conflict' ? (
+          <ConflictIntelligenceView />
+        ) : (
+          <>
         {/* Ask AFRIQORA Conversational Query Bar */}
         <div className="bg-gradient-to-r from-slate-900 via-[#0d1627] to-slate-900 border border-cyan-500/30 rounded-2xl p-4 shadow-xl shadow-cyan-950/20 space-y-3">
           <div className="flex items-center justify-between">
@@ -893,6 +931,8 @@ export const SatelliteIntelligenceHub: React.FC = () => {
             )}
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Interactive Ground-Truth Review & SHA-256 Certification Modal */}

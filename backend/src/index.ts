@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -19,14 +20,94 @@ import commercialRoutes from './modules/commercial/commercial.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import satelliteRoutes from './modules/satellite/satellite.routes';
 import governmentRoutes from './modules/government/government.routes';
+import conflictRoutes from './modules/conflict/conflict.routes';
 
 // Decommissioned Social Media Routers
 import feedRoutes from './modules/feed/feed.routes';
 import creatorRoutes from './modules/creator/creator.routes';
 import messagingRoutes from './modules/messaging/messaging.routes';
 
-app.use(cors({ origin: true, credentials: true }));
+// Native HTTP Security Headers
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// Production-hardened CORS Whitelist
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4000',
+  'http://localhost:4001',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4000',
+  'http://127.0.0.1:4001',
+];
+
+const envOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+  : [];
+
+const allowedOrigins = new Set([...defaultAllowedOrigins, ...envOrigins]);
+
+const isOriginAllowed = (origin: string): boolean => {
+  if (allowedOrigins.has(origin)) return true;
+  if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    return true;
+  }
+  return false;
+};
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin || isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '10mb' }));
+
+// Rate Limiting (Step 4 Security Hardening)
+const isDev = process.env.NODE_ENV !== 'production';
+
+// 1. Sensitive Authentication Rate Limiter (Brute-force and credential stuffing defense)
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15-minute window
+  max: isDev ? 100 : 20, // 20 requests per IP in production, 100 in dev
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Too many authentication attempts. Please try again after 15 minutes.',
+    code: 'AUTH_RATE_LIMIT_EXCEEDED',
+  },
+});
+
+// 2. High-Capacity Satellite Rate Limiter (Compute and raster protection)
+// Generous threshold guarantees that analysts and normal map telemetry are never blocked
+export const satelliteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1-minute window
+  max: isDev ? 300 : 120, // 120 requests/minute in production, 300 in dev
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'Rate limit exceeded for satellite intelligence operations. Please throttle requests.',
+    code: 'SATELLITE_RATE_LIMIT_EXCEEDED',
+  },
+});
+
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
   if (!req.url.startsWith('/assets') && !req.url.endsWith('.ico') && !req.url.endsWith('.png')) {
@@ -36,13 +117,16 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // Flagship Satellite Earth Observation Intelligence API (ML-01 Foundation)
-app.use('/api/satellite', satelliteRoutes);
+app.use('/api/satellite', satelliteLimiter, satelliteRoutes);
+
+// Conflict Intelligence Module (Eastern DRC & Resource Corridor Surveillance)
+app.use('/api/conflict', conflictRoutes);
 
 // Government Investigative Intelligence & Universal Integration API
 app.use('/api/gov', governmentRoutes);
 
 // Core Enterprise, Identity & Commercial API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/commercial', commercialRoutes);
 app.use('/api/admin', adminRoutes);

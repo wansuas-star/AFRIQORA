@@ -3,8 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.satelliteLimiter = exports.authLimiter = void 0;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -21,12 +23,83 @@ const commercial_routes_1 = __importDefault(require("./modules/commercial/commer
 const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
 const satellite_routes_1 = __importDefault(require("./modules/satellite/satellite.routes"));
 const government_routes_1 = __importDefault(require("./modules/government/government.routes"));
+const conflict_routes_1 = __importDefault(require("./modules/conflict/conflict.routes"));
 // Decommissioned Social Media Routers
 const feed_routes_1 = __importDefault(require("./modules/feed/feed.routes"));
 const creator_routes_1 = __importDefault(require("./modules/creator/creator.routes"));
 const messaging_routes_1 = __importDefault(require("./modules/messaging/messaging.routes"));
-app.use((0, cors_1.default)({ origin: true, credentials: true }));
+// Native HTTP Security Headers
+app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+});
+// Production-hardened CORS Whitelist
+const defaultAllowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:4000',
+    'http://localhost:4001',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:4000',
+    'http://127.0.0.1:4001',
+];
+const envOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+    : [];
+const allowedOrigins = new Set([...defaultAllowedOrigins, ...envOrigins]);
+const isOriginAllowed = (origin) => {
+    if (allowedOrigins.has(origin))
+        return true;
+    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return true;
+    }
+    return false;
+};
+app.use((0, cors_1.default)({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+        if (!origin || isOriginAllowed(origin)) {
+            callback(null, true);
+        }
+        else {
+            callback(null, false);
+        }
+    },
+    credentials: true,
+}));
 app.use(express_1.default.json({ limit: '10mb' }));
+// Rate Limiting (Step 4 Security Hardening)
+const isDev = process.env.NODE_ENV !== 'production';
+// 1. Sensitive Authentication Rate Limiter (Brute-force and credential stuffing defense)
+exports.authLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000, // 15-minute window
+    max: isDev ? 100 : 20, // 20 requests per IP in production, 100 in dev
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        ok: false,
+        error: 'Too many authentication attempts. Please try again after 15 minutes.',
+        code: 'AUTH_RATE_LIMIT_EXCEEDED',
+    },
+});
+// 2. High-Capacity Satellite Rate Limiter (Compute and raster protection)
+// Generous threshold guarantees that analysts and normal map telemetry are never blocked
+exports.satelliteLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60 * 1000, // 1-minute window
+    max: isDev ? 300 : 120, // 120 requests/minute in production, 300 in dev
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        ok: false,
+        error: 'Rate limit exceeded for satellite intelligence operations. Please throttle requests.',
+        code: 'SATELLITE_RATE_LIMIT_EXCEEDED',
+    },
+});
 app.use((req, _res, next) => {
     if (!req.url.startsWith('/assets') && !req.url.endsWith('.ico') && !req.url.endsWith('.png')) {
         console.log('[' + new Date().toISOString() + '] ' + req.method + ' ' + req.url);
@@ -34,11 +107,13 @@ app.use((req, _res, next) => {
     next();
 });
 // Flagship Satellite Earth Observation Intelligence API (ML-01 Foundation)
-app.use('/api/satellite', satellite_routes_1.default);
+app.use('/api/satellite', exports.satelliteLimiter, satellite_routes_1.default);
+// Conflict Intelligence Module (Eastern DRC & Resource Corridor Surveillance)
+app.use('/api/conflict', conflict_routes_1.default);
 // Government Investigative Intelligence & Universal Integration API
 app.use('/api/gov', government_routes_1.default);
 // Core Enterprise, Identity & Commercial API Routes
-app.use('/api/auth', auth_routes_1.default);
+app.use('/api/auth', exports.authLimiter, auth_routes_1.default);
 app.use('/api/users', users_routes_1.default);
 app.use('/api/commercial', commercial_routes_1.default);
 app.use('/api/admin', admin_routes_1.default);

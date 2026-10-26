@@ -17,6 +17,7 @@ import { SatelliteIntelligenceHub } from './components/SatelliteIntelligenceHub'
 import { EarthObservationView } from './components/satellite/EarthObservationView';
 import { ChangeIntelligenceView } from './components/satellite/ChangeIntelligenceView';
 import { MiningIntelligenceView } from './components/satellite/MiningIntelligenceView';
+import { ConflictIntelligenceView } from './components/satellite/ConflictIntelligenceView';
 import { BusinessDirectory } from './components/BusinessDirectory';
 import { JobsOpportunitiesView } from './components/JobsOpportunitiesView';
 import { AccountSettingsView } from './components/AccountSettingsView';
@@ -170,6 +171,8 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'satellite' && <SatelliteIntelligenceHub />}
+
+            {activeTab === 'conflict' && <ConflictIntelligenceView />}
 
             {activeTab === 'change-intelligence' && <ChangeIntelligenceView />}
 

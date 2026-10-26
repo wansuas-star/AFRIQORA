@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../../config/prisma';
+import { getJwtSecret } from '../../shared/auth.middleware';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -28,7 +29,7 @@ export const register = async (req: Request, res: Response) => {
       }
     });
 
-    const jwtSecret = process.env.JWT_SECRET || 'afriqora_development_isolated_jwt_secret_2026';
+    const jwtSecret = getJwtSecret();
     const token = jwt.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' });
 
     res.status(201).json({ token, user: { id: user.id, email: user.email, displayName: user.displayName, afriqoraId: user.afriqoraId } });
@@ -52,7 +53,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'afriqora_development_isolated_jwt_secret_2026';
+    const jwtSecret = getJwtSecret();
     const token = jwt.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' });
 
     res.json({ token, user: { id: user.id, email: user.email, displayName: user.displayName, afriqoraId: user.afriqoraId } });

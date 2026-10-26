@@ -35,6 +35,7 @@ export function checkGrantValidity(grant: any): { isValid: boolean; reason: stri
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import prisma from '../../config/prisma';
+import { getJwtSecret } from '../../shared/auth.middleware';
 import { IntegrationHub } from './integrations/integrationHub';
 import { QueryScope } from './integrations/adapter.interface';
 
@@ -564,7 +565,7 @@ export class GovernmentController {
 
       const now = new Date();
       const sigPayload = `${integration.id}:${ownerId}:${now.toISOString()}:${integration.category}`;
-      const ownerApprovalSignature = crypto.createHmac('sha256', process.env.JWT_SECRET || 'afriqora_owner_secure_signing_salt_2026').update(sigPayload).digest('hex');
+      const ownerApprovalSignature = crypto.createHmac('sha256', getJwtSecret()).update(sigPayload).digest('hex');
 
       const updated = await prisma.authorizedIntegration.update({
         where: { id },
@@ -723,7 +724,7 @@ export class GovernmentController {
       const now = new Date();
       const sigPayload = `${request.id}:${ownerId}:${now.toISOString()}:${request.agencyId}`;
       const approvalSignature = crypto
-        .createHmac('sha256', process.env.JWT_SECRET || 'afriqora_owner_secure_signing_salt_2026')
+        .createHmac('sha256', getJwtSecret())
         .update(sigPayload)
         .digest('hex');
 

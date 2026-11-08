@@ -113,14 +113,9 @@ export class SearchController {
 
     const types = typeParam.split(',').map(t => t.trim());
     const isAll = types.includes('all');
-    const isSatellite = isAll || types.includes('satellite') || types.includes('targets') || types.includes('aoi') || types.includes('satellite_target') || types.includes('earth-observation');
-    const isBusinesses = isAll || types.includes('businesses') || types.includes('business') || types.includes('enterprise');
+    const isSatellite = isAll || types.includes('satellite') || types.includes('targets') || types.includes('aoi') || types.includes('satellite_target') || types.includes('earth-observation') || types.includes('maritime');
     const wantsPeople = types.includes('people');
     const isUsers = isAll || types.includes('users') || types.includes('user') || types.includes('profiles') || types.includes('profile') || wantsPeople;
-    const isServices = isAll || types.includes('services') || types.includes('service');
-    const isPosts = isAll || types.includes('posts') || types.includes('post') || types.includes('content');
-    const isVideos = isAll || types.includes('videos') || types.includes('video');
-    const isCategories = isAll || types.includes('categories') || types.includes('category');
 
     const results: SearchResultItem[] = [];
 
@@ -211,115 +206,7 @@ export class SearchController {
         }
       }
 
-      // 2. Verified Businesses & Enterprises
-      if (isBusinesses) {
-        const businesses = await prisma.businessProfile.findMany({
-          where: {
-            ...(q && q !== 'businesses' && q !== 'all' ? {
-              OR: [
-                { businessName: { contains: q } },
-                { category: { contains: q } },
-                { description: { contains: q } },
-                { location: { contains: q } },
-              ],
-            } : {}),
-            ...(category ? { category: { contains: category } } : {}),
-            ...(location ? { location: { contains: location } } : {}),
-          },
-          include: {
-            campaigns: {
-              where: { status: 'active' },
-              take: 1,
-            },
-          },
-          orderBy: [
-            { isVerified: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: limit,
-        });
-
-        for (const b of businesses) {
-          const activeCampaign = b.campaigns && b.campaigns.length > 0 ? b.campaigns[0] : null;
-          results.push({
-            type: 'businesses',
-            id: b.id,
-            title: b.businessName,
-            subtitle: b.category,
-            description: b.description || undefined,
-            avatarUrl: b.logo || undefined,
-            category: b.category,
-            location: b.location || undefined,
-            isVerified: b.isVerified,
-            isSponsored: !!activeCampaign,
-            campaignId: activeCampaign?.id,
-            score: (activeCampaign ? 120 : 0) + (b.isVerified ? 80 : 40),
-            createdAt: b.createdAt,
-          });
-
-          // Also generate service result item if services were requested
-          if (isServices) {
-            results.push({
-              type: 'services',
-              id: `${b.id}-service`,
-              title: `${b.businessName} - Professional ${b.category} Services`,
-              subtitle: b.category,
-              description: b.description || `Specialized ${b.category} operations and client solutions in ${b.location || 'region'}.`,
-              category: b.category,
-              location: b.location || undefined,
-              isVerified: b.isVerified,
-              score: 75,
-              createdAt: b.createdAt,
-            });
-          }
-
-          // Generate posts/content result item if posts were requested
-          if (isPosts) {
-            results.push({
-              type: 'posts',
-              id: `post-${b.id}`,
-              title: `${b.businessName} Service Guide & Operational Notes`,
-              subtitle: b.category,
-              description: b.description || `Operational overview and service workflows for ${b.businessName}.`,
-              category: b.category,
-              location: b.location || undefined,
-              score: 70,
-              createdAt: b.createdAt,
-            });
-          }
-
-          // Generate video result item if videos were requested
-          if (isVideos) {
-            results.push({
-              type: 'videos',
-              id: `video-${b.id}`,
-              title: `${b.businessName} Technical Walkthrough & Demo Video`,
-              subtitle: 'Demonstration Video',
-              description: `Video walkthrough for ${b.category} inspections and operations.`,
-              category: b.category,
-              location: b.location || undefined,
-              mediaUrl: 'https://cdn.afriqora.local/video-demo.mp4',
-              score: 65,
-              createdAt: b.createdAt,
-            });
-          }
-
-          // Generate category item if categories were requested
-          if (isCategories && b.category) {
-            results.push({
-              type: 'categories',
-              id: `cat-${b.category.toLowerCase().replace(/\s+/g, '-')}`,
-              title: b.category,
-              subtitle: 'Enterprise Industry Category',
-              category: b.category,
-              score: 60,
-              createdAt: b.createdAt,
-            });
-          }
-        }
-      }
-
-      // 3. User Accounts & Professional Profiles
+      // 2. User Accounts & Operator Profiles
       if (isUsers) {
         const isOperatorQuery = q.toLowerCase().includes('operator') || q.toLowerCase().includes('owner') || q.toLowerCase().includes('admin');
         const users = await prisma.user.findMany({

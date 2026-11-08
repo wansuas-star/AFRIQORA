@@ -12,15 +12,13 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 4001;
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const users_routes_1 = __importDefault(require("./modules/users/users.routes"));
-const monetization_routes_1 = __importDefault(require("./modules/monetization/monetization.routes"));
 const connect_routes_1 = __importDefault(require("./modules/connect/connect.routes"));
 const search_routes_1 = __importDefault(require("./modules/search/search.routes"));
 const notifications_routes_1 = __importDefault(require("./modules/notifications/notifications.routes"));
-const commercial_routes_1 = __importDefault(require("./modules/commercial/commercial.routes"));
-const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
 const satellite_routes_1 = __importDefault(require("./modules/satellite/satellite.routes"));
 const government_routes_1 = __importDefault(require("./modules/government/government.routes"));
 const conflict_routes_1 = __importDefault(require("./modules/conflict/conflict.routes"));
@@ -48,8 +46,11 @@ const defaultAllowedOrigins = [
     'http://127.0.0.1:4000',
     'http://127.0.0.1:4001',
 ];
-const envOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+const rawOrigins = [process.env.ALLOWED_ORIGINS, process.env.CORS_ORIGIN]
+    .filter(Boolean)
+    .join(',');
+const envOrigins = rawOrigins
+    ? rawOrigins.split(',').map((o) => o.trim()).filter(Boolean)
     : [];
 const allowedOrigins = new Set([...defaultAllowedOrigins, ...envOrigins]);
 const isOriginAllowed = (origin) => {
@@ -112,15 +113,24 @@ app.use('/api/satellite', exports.satelliteLimiter, satellite_routes_1.default);
 app.use('/api/conflict', conflict_routes_1.default);
 // Government Investigative Intelligence & Universal Integration API
 app.use('/api/gov', government_routes_1.default);
-// Core Enterprise, Identity & Commercial API Routes
+// Core Identity, Connectivity, Search & Notifications API Routes
 app.use('/api/auth', exports.authLimiter, auth_routes_1.default);
 app.use('/api/users', users_routes_1.default);
-app.use('/api/commercial', commercial_routes_1.default);
-app.use('/api/admin', admin_routes_1.default);
-app.use('/api/monetization', monetization_routes_1.default);
 app.use('/api/connect', connect_routes_1.default);
 app.use('/api/search', search_routes_1.default);
 app.use('/api/notifications', notifications_routes_1.default);
+// Decommissioned Commercial, Business & Advertising Endpoints (HTTP 410 Gone)
+const decommissionedCommercialHandler = (_req, res) => {
+    res.status(410).json({
+        error: 'AFRIQORA is exclusively a satellite technology, satellite communications, Earth observation, and geospatial intelligence platform. Commercial, business directory, verification, and advertising functionality has been decommissioned.',
+        code: 'COMMERCIAL_MODULE_DECOMMISSIONED',
+    });
+};
+app.use('/api/commercial', decommissionedCommercialHandler);
+app.use('/api/admin/moderation', decommissionedCommercialHandler);
+app.use('/api/admin/commercial', decommissionedCommercialHandler);
+app.use('/api/admin', decommissionedCommercialHandler);
+app.use('/api/monetization', decommissionedCommercialHandler);
 // Decommissioned Social Media Endpoints (HTTP 410 Gone)
 const decommissionedSocialHandler = (_req, res) => {
     res.status(410).json({

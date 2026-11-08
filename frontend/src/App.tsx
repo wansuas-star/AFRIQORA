@@ -6,7 +6,6 @@ import { Header } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { AuthModal } from './components/AuthModal';
-import { BusinessVerificationModal } from './components/BusinessVerificationModal';
 import { UnifiedSearchModal } from './components/UnifiedSearchModal';
 import { SearchView } from './components/SearchView';
 import { NotificationsDrawer } from './components/NotificationsDrawer';
@@ -18,15 +17,12 @@ import { EarthObservationView } from './components/satellite/EarthObservationVie
 import { ChangeIntelligenceView } from './components/satellite/ChangeIntelligenceView';
 import { MiningIntelligenceView } from './components/satellite/MiningIntelligenceView';
 import { ConflictIntelligenceView } from './components/satellite/ConflictIntelligenceView';
-import { BusinessDirectory } from './components/BusinessDirectory';
-import { JobsOpportunitiesView } from './components/JobsOpportunitiesView';
 import { AccountSettingsView } from './components/AccountSettingsView';
 
 export const App: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -44,10 +40,6 @@ export const App: React.FC = () => {
       }
       if (isAuthModalOpen) {
         setIsAuthModalOpen(false);
-        return true;
-      }
-      if (isVerificationModalOpen) {
-        setIsVerificationModalOpen(false);
         return true;
       }
       if (isSearchModalOpen) {
@@ -69,7 +61,6 @@ export const App: React.FC = () => {
   }, [
     isMobileSidebarOpen,
     isAuthModalOpen,
-    isVerificationModalOpen,
     isSearchModalOpen,
     isNotificationsOpen,
     activeTab,
@@ -180,20 +171,11 @@ export const App: React.FC = () => {
 
             {activeTab === 'mining' && <MiningIntelligenceView />}
 
-            {activeTab === 'business-intelligence' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <BusinessDirectory openAuthModal={() => setIsAuthModalOpen(true)} />
-              </div>
-            )}
-
-            {activeTab === 'jobs' && <JobsOpportunitiesView />}
-
             {activeTab === 'search' && <SearchView setActiveTab={setActiveTab} />}
 
             {activeTab === 'settings' && (
               <AccountSettingsView
                 openAuthModal={() => setIsAuthModalOpen(true)}
-                openVerificationModal={() => setIsVerificationModalOpen(true)}
               />
             )}
           </div>
@@ -230,7 +212,7 @@ export const App: React.FC = () => {
                 style={{ width: '24px', height: '24px', objectFit: 'contain' }}
               />
               <span>
-                &copy; {new Date().getFullYear()} AFRIQORA &bull; African Space Technology, Satellite Intelligence &amp; Geospatial Information Platform.
+                &copy; {new Date().getFullYear()} AFRIQORA &bull; African Space Technology, Satellite Communications, Earth Observation &amp; Geospatial Intelligence Platform.
               </span>
             </div>
 
@@ -244,14 +226,14 @@ export const App: React.FC = () => {
               <button onClick={() => setActiveTab('earth-observation')} className="btn btn-ghost" style={{ padding: 0 }}>
                 Earth Observation
               </button>
+              <button onClick={() => setActiveTab('change-intelligence')} className="btn btn-ghost" style={{ padding: 0 }}>
+                Change Intelligence
+              </button>
               <button onClick={() => setActiveTab('mining')} className="btn btn-ghost" style={{ padding: 0 }}>
                 Mining Radar
               </button>
-              <button onClick={() => setActiveTab('business-intelligence')} className="btn btn-ghost" style={{ padding: 0 }}>
-                Business Intelligence
-              </button>
-              <button onClick={() => setActiveTab('jobs')} className="btn btn-ghost" style={{ padding: 0 }}>
-                Opportunities
+              <button onClick={() => setActiveTab('conflict')} className="btn btn-ghost" style={{ padding: 0 }}>
+                DRC Satellite Intel
               </button>
             </div>
           </div>
@@ -267,12 +249,7 @@ export const App: React.FC = () => {
 
         {/* Global Modals & Drawers */}
         <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
-        <BusinessVerificationModal
-          isOpen={isVerificationModalOpen}
-          onClose={() => setIsVerificationModalOpen(false)}
-          onSuccess={() => setIsVerificationModalOpen(false)}
-        />
-        <UnifiedSearchModal isOpen={isSearchModalOpen} onClose={() => setIsSearchModalOpen(false)} />
+        <UnifiedSearchModal isOpen={isSearchModalOpen} onClose={() => setIsSearchModalOpen(false)} setActiveTab={setActiveTab} />
         <NotificationsDrawer
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}

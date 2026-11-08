@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import { getPlatformOwnerEmail, isVerifiedPlatformOwner } from '../../shared/auth.middleware';
 import {
   ConflictIncident,
   ConflictModuleState,
@@ -36,14 +37,12 @@ let incidentsStore: ConflictIncident[] = [...EASTERN_DRC_CONFLICT_INCIDENTS];
 export class ConflictController {
   private static copernicus = new CopernicusCDSEProvider();
   private static getPlatformOwnerEmail(): string {
-    return (process.env.PLATFORM_OWNER_EMAIL || 'owner@afriqora.com').toLowerCase().trim();
+    return getPlatformOwnerEmail();
   }
 
   private static isPlatformOwner(req: Request): boolean {
     const user = (req as any).user;
-    if (!user || !user.email) return false;
-    const ownerEmail = ConflictController.getPlatformOwnerEmail();
-    return user.email.toLowerCase().trim() === ownerEmail || Boolean(user.isPlatformOwner);
+    return isVerifiedPlatformOwner(user);
   }
 
   private static logAudit(actorEmail: string, action: string, details: string, targetIncidentId?: string): ConflictAuditEntry {
@@ -91,7 +90,9 @@ export class ConflictController {
         res.status(403).json({
           ok: false,
           code: 'UNAUTHORIZED_OWNER_GATE_REJECTED',
-          error: `Activation denied. Conflict Intelligence can ONLY be activated by the designated Platform Owner (${ownerEmail}).`,
+          error: ownerEmail
+            ? `Activation denied. Conflict Intelligence can ONLY be activated by the designated Platform Owner (${ownerEmail}).`
+            : 'Activation denied. Conflict Intelligence can ONLY be activated by the designated Platform Owner.',
         });
         return;
       }

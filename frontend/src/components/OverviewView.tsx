@@ -4,7 +4,6 @@ import {
   Sparkles,
   Layers,
   Pickaxe,
-  Building2,
   ArrowRight,
   Globe2,
   Search,
@@ -408,7 +407,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* 4. Business Intelligence */}
+          {/* 4. Satellite Communications & Maritime Intelligence */}
           <div
             className="glass-panel"
             style={{
@@ -421,22 +420,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
-            onClick={() => setActiveTab('business-intelligence')}
+            onClick={() => setActiveTab('satellite')}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem' }}>
               <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'rgba(96, 165, 250, 0.15)', color: '#60a5fa' }}>
-                <Building2 size={22} />
+                <Radio size={22} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Business Intelligence</h3>
-                <span style={{ fontSize: '0.72rem', color: '#60a5fa' }}>Verified Enterprises</span>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Maritime &amp; SatComms</h3>
+                <span style={{ fontSize: '0.72rem', color: '#60a5fa' }}>SAR Vessel &amp; Telemetry</span>
               </div>
             </div>
             <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: '0 0 1rem' }}>
-              African commercial enterprise registry, official business verification, and aerospace industry procurement connections.
+              Sentinel-1 C-band SAR maritime vessel detection, continental port anchorage monitoring, and satellite communications downlink telemetry.
             </p>
             <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600, color: '#60a5fa' }}>
-              Access Directory <ArrowRight size={14} />
+              Open Maritime &amp; Comms Hub <ArrowRight size={14} />
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 /**
  * AFRIQORA Production Process Manager Configuration (PM2)
- * Ensures high-availability, zero-downtime clustering, memory protection, and secure logging.
+ * Configured in single-instance fork mode to guarantee SQLite single-writer consistency,
+ * memory protection, and deterministic audit logging.
  */
 
 module.exports = {
@@ -9,8 +10,8 @@ module.exports = {
       name: 'afriqora-production-api',
       script: './dist/index.js',
       cwd: __dirname,
-      instances: 'max',
-      exec_mode: 'cluster',
+      instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',

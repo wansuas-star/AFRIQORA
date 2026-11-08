@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConflictController = void 0;
 const crypto_1 = __importDefault(require("crypto"));
+const auth_middleware_1 = require("../../shared/auth.middleware");
 const copernicus_provider_1 = require("../satellite/providers/copernicus.provider");
 const sentinel1_sar_1 = require("../satellite/pipelines/sentinel1.sar");
 const sentinel2_optical_1 = require("../satellite/pipelines/sentinel2.optical");
@@ -30,14 +31,11 @@ let incidentsStore = [...drcConflictDataset_1.EASTERN_DRC_CONFLICT_INCIDENTS];
 class ConflictController {
     static copernicus = new copernicus_provider_1.CopernicusCDSEProvider();
     static getPlatformOwnerEmail() {
-        return (process.env.PLATFORM_OWNER_EMAIL || 'owner@afriqora.com').toLowerCase().trim();
+        return (0, auth_middleware_1.getPlatformOwnerEmail)();
     }
     static isPlatformOwner(req) {
         const user = req.user;
-        if (!user || !user.email)
-            return false;
-        const ownerEmail = ConflictController.getPlatformOwnerEmail();
-        return user.email.toLowerCase().trim() === ownerEmail || Boolean(user.isPlatformOwner);
+        return (0, auth_middleware_1.isVerifiedPlatformOwner)(user);
     }
     static logAudit(actorEmail, action, details, targetIncidentId) {
         const timestamp = new Date().toISOString();
@@ -81,7 +79,9 @@ class ConflictController {
                 res.status(403).json({
                     ok: false,
                     code: 'UNAUTHORIZED_OWNER_GATE_REJECTED',
-                    error: `Activation denied. Conflict Intelligence can ONLY be activated by the designated Platform Owner (${ownerEmail}).`,
+                    error: ownerEmail
+                        ? `Activation denied. Conflict Intelligence can ONLY be activated by the designated Platform Owner (${ownerEmail}).`
+                        : 'Activation denied. Conflict Intelligence can ONLY be activated by the designated Platform Owner.',
                 });
                 return;
             }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SearchItem } from '../types';
 import { searchApi } from '../services/api';
-import { Search, X, Building2, User, Globe, ArrowRight } from 'lucide-react';
+import { Search, X, User, Globe, ArrowRight } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
 interface UnifiedSearchModalProps {
@@ -49,8 +49,6 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({
     if (setActiveTab) {
       if (item.type === 'satellite_target') {
         setActiveTab('change-intelligence');
-      } else if (item.type === 'businesses') {
-        setActiveTab('business-intelligence');
       } else if (item.type === 'users') {
         setActiveTab('settings');
       }
@@ -60,7 +58,6 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({
 
   const typeIcons: Record<string, React.ReactNode> = {
     satellite_target: <Globe size={16} style={{ color: '#34d399' }} />,
-    businesses: <Building2 size={16} style={{ color: 'var(--accent)' }} />,
     users: <User size={16} style={{ color: 'var(--gold)' }} />,
   };
 
@@ -108,7 +105,7 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({
           <input
             type="text"
             autoFocus
-            placeholder="Search satellite AOIs, African enterprises, or profiles..."
+            placeholder="Search satellite AOIs, maritime corridors, mining concessions, or profiles..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{
@@ -146,8 +143,7 @@ export const UnifiedSearchModal: React.FC<UnifiedSearchModalProps> = ({
         >
           {[
             { id: 'all', label: 'All' },
-            { id: 'satellite', label: 'Satellite' },
-            { id: 'businesses', label: 'Businesses' },
+            { id: 'satellite', label: 'Satellite & Maritime' },
             { id: 'profiles', label: 'Profiles' },
           ].map((t) => (
             <button

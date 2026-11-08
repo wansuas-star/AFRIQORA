@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireOfficer = exports.requirePlatformOwner = exports.requireAuth = exports.attachAuth = void 0;
 exports.getJwtSecret = getJwtSecret;
 exports.extractUserId = extractUserId;
+exports.getPlatformOwnerEmail = getPlatformOwnerEmail;
+exports.isVerifiedPlatformOwner = isVerifiedPlatformOwner;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../config/prisma"));
 function parseCookies(req) {
@@ -100,6 +102,25 @@ const requireAuth = async (req, res, next) => {
     next();
 };
 exports.requireAuth = requireAuth;
+function getPlatformOwnerEmail() {
+    return (process.env.PLATFORM_OWNER_EMAIL || '').trim().toLowerCase();
+}
+/**
+ * Canonical Single-Owner Verification Rule:
+ * 1. User record must exist and have isPlatformOwner === true in the database.
+ * 2. PLATFORM_OWNER_EMAIL must be explicitly configured in the environment (fails closed if missing).
+ * 3. user.email must strictly match PLATFORM_OWNER_EMAIL (AND logic, never OR, zero fallback shortcuts).
+ */
+function isVerifiedPlatformOwner(user) {
+    if (!user || !user.email || !user.isPlatformOwner) {
+        return false;
+    }
+    const ownerEmail = getPlatformOwnerEmail();
+    if (!ownerEmail) {
+        return false;
+    }
+    return Boolean(user.isPlatformOwner) && user.email.trim().toLowerCase() === ownerEmail;
+}
 /**
  * Single Platform Owner Authorization Guard
  * Strictly restricts execution to the designated single global platform owner.
@@ -117,9 +138,7 @@ const requirePlatformOwner = async (req, res, next) => {
     if (!user) {
         return res.status(401).json({ error: 'Unauthorized: User not found' });
     }
-    const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL || '').trim().toLowerCase();
-    const isEmailMatch = ownerEmail ? user.email.toLowerCase() === ownerEmail : true;
-    if (!user.isPlatformOwner || !isEmailMatch) {
+    if (!isVerifiedPlatformOwner(user)) {
         return res.status(403).json({
             error: 'Forbidden: Platform Owner authority required. Action strictly restricted to single platform owner.',
         });

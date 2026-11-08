@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../config/prisma';
 import { NaturalLanguageQueryParser } from './intelligence/queryParser';
 import { ChangeDetectionEngine } from './ml/changeDetection';
 import { EpistemicReasoner } from './intelligence/epistemicReasoner';
@@ -18,8 +18,6 @@ import {
   DataIntegrityClassification,
 } from './types';
 import { AfricanMaritimeRegistry } from './maritimeRegistry';
-
-const prisma = new PrismaClient();
 
 const PRESET_LOCATIONS: Array<{
   name: string;

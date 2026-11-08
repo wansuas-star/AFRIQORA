@@ -4,7 +4,7 @@ import {
   User as UserIcon,
   ShieldCheck,
   Key,
-  Building2,
+  Radio,
   CheckCircle2,
   Copy,
   LogOut
@@ -13,12 +13,11 @@ import { useAuth } from '../context/AuthContext';
 
 interface AccountSettingsViewProps {
   openAuthModal: () => void;
-  openVerificationModal: () => void;
+  openVerificationModal?: () => void;
 }
 
 export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
   openAuthModal,
-  openVerificationModal,
 }) => {
   const { user, logout } = useAuth();
   const [apiKeyCopied, setApiKeyCopied] = useState(false);
@@ -57,7 +56,7 @@ export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
           </div>
         </div>
         <p style={{ color: '#94a3b8', fontSize: '0.98rem', maxWidth: '780px', lineHeight: 1.6, margin: 0 }}>
-          Manage your enterprise profile, business verification credentials, satellite tasking API tokens, and Copernicus Data Space Ecosystem (CDSE) connections.
+          Manage your satellite operator profile, telemetry API tokens, Sentinel-1 SAR / Sentinel-2 Optical pipelines, and Copernicus Data Space Ecosystem (CDSE) connections.
         </p>
       </div>
 
@@ -134,38 +133,23 @@ export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
             </button>
           </div>
 
-          {/* Business Verification Card */}
+          {/* Satellite Ground Segment & Pipeline Status Card */}
           <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '14px', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <Building2 size={22} color="#fbbf24" />
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>African Business Verification</h3>
+              <Radio size={22} color="#34d399" />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Satellite Pipelines &amp; Ground Segment</h3>
             </div>
 
             <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, marginBottom: '1.2rem' }}>
-              Verified African enterprises receive verified gold badge status, prioritized search ranking, and authenticated satellite intelligence report credentials.
+              Decoupled Sentinel-1 C-band SAR and Sentinel-2 Multi-Spectral Optical pipelines with ML-01 change detection and maritime vessel telemetry.
             </p>
 
-            <div style={{ padding: '0.85rem', borderRadius: '10px', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.25)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <ShieldCheck size={20} color="#fbbf24" />
+            <div style={{ padding: '0.85rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <ShieldCheck size={20} color="#34d399" />
               <div style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                Submit official registration documents, tax identification, and corporate address to verify your organization.
+                Sentinel-1 SAR, Sentinel-2 Optical, Maritime CFAR &amp; AWS Earth Search STAC v1 pipelines active.
               </div>
             </div>
-
-            <button
-              className="btn btn-primary"
-              onClick={openVerificationModal}
-              style={{
-                width: '100%',
-                padding: '0.65rem',
-                fontSize: '0.85rem',
-                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
-                color: '#0f172a',
-                fontWeight: 700,
-              }}
-            >
-              Launch Business Verification
-            </button>
           </div>
 
           {/* API Access & Copernicus Integration */}

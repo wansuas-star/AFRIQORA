@@ -35,7 +35,7 @@ export function checkGrantValidity(grant: any): { isValid: boolean; reason: stri
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import prisma from '../../config/prisma';
-import { getJwtSecret } from '../../shared/auth.middleware';
+import { getJwtSecret, isVerifiedPlatformOwner } from '../../shared/auth.middleware';
 import { IntegrationHub } from './integrations/integrationHub';
 import { QueryScope } from './integrations/adapter.interface';
 
@@ -686,7 +686,7 @@ export class GovernmentController {
    */
   public static async listAccessRequests(req: Request, res: Response): Promise<void> {
     try {
-      const isOwner = (req as any).user?.isPlatformOwner;
+      const isOwner = isVerifiedPlatformOwner((req as any).user);
       const officerAgencyId = (req as any).officer?.agencyId;
 
       const whereClause: any = {};

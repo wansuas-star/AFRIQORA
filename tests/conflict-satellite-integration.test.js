@@ -15,30 +15,102 @@
  */
 
 const http = require('http');
-const jwt = require('C:/Users/hp/Documents/AFRQORA/backend/node_modules/jsonwebtoken');
-const express = require('C:/Users/hp/Documents/AFRQORA/backend/node_modules/express');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
-process.env.DATABASE_URL = 'file:C:/Users/hp/Documents/AFRQORA/backend/prisma/dev.db';
+const backendRoot = path.resolve(__dirname, '../backend');
+const jwt = require(path.join(backendRoot, 'node_modules/jsonwebtoken'));
+const express = require(path.join(backendRoot, 'node_modules/express'));
 
-const { getJwtSecret } = require('C:/Users/hp/Documents/AFRQORA/backend/dist/shared/auth.middleware');
-const conflictRoutes = require('C:/Users/hp/Documents/AFRQORA/backend/dist/modules/conflict/conflict.routes').default;
+// Enforce strict database isolation: never connect to backend/prisma/dev.db
+const backupsDir = path.join(backendRoot, 'backups');
+const latestBackupFile = fs
+  .readdirSync(backupsDir)
+  .filter((f) => f.endsWith('.sqlite'))
+  .sort()
+  .pop();
+
+if (!latestBackupFile) {
+  throw new Error('No verified backup snapshot found in backend/backups to seed isolated test database.');
+}
+
+const isolatedTestDbPath = path.resolve(
+  os.tmpdir(),
+  `afriqora-test-isolated-${process.pid}-${Date.now()}.db`
+);
+
+function assertSafeIsolatedTestDbPath(targetPath) {
+  const resolvedTarget = path.resolve(targetPath);
+  const resolvedTmpDir = path.resolve(os.tmpdir());
+  const resolvedRepoRoot = path.resolve(__dirname, '..');
+  const resolvedBackendRoot = path.resolve(backendRoot);
+  const resolvedBackupsDir = path.resolve(backupsDir);
+  const resolvedLiveDb = path.resolve(backendRoot, 'prisma/dev.db');
+  const fileName = path.basename(resolvedTarget);
+  const normTarget = resolvedTarget.replace(/\\/g, '/').toLowerCase();
+  const normRepo = resolvedRepoRoot.replace(/\\/g, '/').toLowerCase();
+  const normBackend = resolvedBackendRoot.replace(/\\/g, '/').toLowerCase();
+  const normBackups = resolvedBackupsDir.replace(/\\/g, '/').toLowerCase();
+  const normLiveDb = resolvedLiveDb.replace(/\\/g, '/').toLowerCase();
+
+  if (
+    path.dirname(resolvedTarget).toLowerCase() !== resolvedTmpDir.toLowerCase() ||
+    !/^afriqora-test-isolated-\d+-\d+\.db$/.test(fileName) ||
+    normTarget === normLiveDb ||
+    normTarget.startsWith(normRepo + '/') ||
+    normTarget.startsWith(normBackend + '/') ||
+    normTarget.startsWith(normBackups + '/') ||
+    normTarget.includes('prisma/dev.db') ||
+    normTarget.endsWith('/dev.db') ||
+    normTarget.endsWith('.sqlite')
+  ) {
+    throw new Error(
+      `[FATAL-DB-SAFETY-GUARD] Refusing operation on protected or non-isolated database path: ${resolvedTarget}`
+    );
+  }
+  return resolvedTarget;
+}
+
+const verifiedIsolatedDbPath = assertSafeIsolatedTestDbPath(isolatedTestDbPath);
+console.log(`[DB-SAFETY-GUARD] Verified isolatedTestDbPath: ${verifiedIsolatedDbPath}`);
+fs.copyFileSync(path.join(backupsDir, latestBackupFile), verifiedIsolatedDbPath);
+
+process.env.NODE_ENV = 'test';
+process.env.AFRIQORA_TEST_ISOLATION = 'true';
+process.env.DATABASE_URL = `file:${verifiedIsolatedDbPath.replace(/\\/g, '/')}`;
+
+// Test-only fixture credentials (never used in production runtime)
+const TEST_PLATFORM_OWNER_FIXTURE = {
+  id: '0bdc6e2b-8025-46c5-bca2-1e7f1f42fbc6',
+  email: 'owner@afriqora.internal',
+  isPlatformOwner: true,
+};
+
+const TEST_ANALYST_FIXTURE = {
+  id: '08a825b1-ccc8-455b-8a88-ecd2b4abfb82',
+  email: 'analyst@afriqora.internal',
+  isPlatformOwner: false,
+};
+
+process.env.PLATFORM_OWNER_EMAIL = TEST_PLATFORM_OWNER_FIXTURE.email;
+
+const prisma = require(path.join(backendRoot, 'dist/config/prisma')).default;
+const { getJwtSecret } = require(path.join(backendRoot, 'dist/shared/auth.middleware'));
+const conflictRoutes = require(path.join(backendRoot, 'dist/modules/conflict/conflict.routes')).default;
 
 const JWT_SECRET = getJwtSecret();
 
-const PLATFORM_OWNER = {
-  id: '0bdc6e2b-8025-46c5-bca2-1e7f1f42fbc6',
-  email: 'owner@afriqora.internal',
-  isPlatformOwner: true
-};
-
-const ANALYST_USER = {
-  id: '08a825b1-ccc8-455b-8a88-ecd2b4abfb82',
-  email: 'analyst@afriqora.internal',
-  isPlatformOwner: false
-};
-
-const ownerToken = jwt.sign({ userId: PLATFORM_OWNER.id, email: PLATFORM_OWNER.email }, JWT_SECRET, { expiresIn: '1h' });
-const analystToken = jwt.sign({ userId: ANALYST_USER.id, email: ANALYST_USER.email }, JWT_SECRET, { expiresIn: '1h' });
+const ownerToken = jwt.sign(
+  { userId: TEST_PLATFORM_OWNER_FIXTURE.id, email: TEST_PLATFORM_OWNER_FIXTURE.email },
+  JWT_SECRET,
+  { expiresIn: '1h' }
+);
+const analystToken = jwt.sign(
+  { userId: TEST_ANALYST_FIXTURE.id, email: TEST_ANALYST_FIXTURE.email },
+  JWT_SECRET,
+  { expiresIn: '1h' }
+);
 
 const app = express();
 app.use(express.json());
@@ -316,7 +388,14 @@ async function runIntegrationSuite() {
     console.log('======================================================================');
   } finally {
     if (server) {
-      server.close();
+      await new Promise((resolve) => server.close(() => resolve()));
+    }
+    await prisma.$disconnect();
+    console.log('[DB-SAFETY-GUARD] Prisma disconnected cleanly before temp DB cleanup.');
+    const safeDeletePath = assertSafeIsolatedTestDbPath(isolatedTestDbPath);
+    if (fs.existsSync(safeDeletePath)) {
+      fs.unlinkSync(safeDeletePath);
+      console.log(`[DB-SAFETY-GUARD] Deleted isolated temp DB: ${safeDeletePath}`);
     }
   }
 }

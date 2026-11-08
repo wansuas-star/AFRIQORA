@@ -11,7 +11,13 @@ const TAG_LENGTH = 16;
 
 export class CredentialVault {
   private static getMasterKey(): Buffer {
-    const rawKey = process.env.INTEGRATION_MASTER_KEY || 'afriqora_secure_government_key_2026_dev_seed';
+    const envKey = process.env.INTEGRATION_MASTER_KEY?.trim();
+    if (!envKey && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'CRITICAL SECURITY ERROR: INTEGRATION_MASTER_KEY environment variable must be explicitly configured in production.'
+      );
+    }
+    const rawKey = envKey || 'afriqora_secure_government_key_2026_dev_seed';
     return crypto.createHash('sha256').update(rawKey).digest();
   }
 

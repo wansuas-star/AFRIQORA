@@ -3,7 +3,6 @@ import {
   Search,
   X,
   Globe,
-  Building2,
   User,
   ArrowRight,
   CheckCircle2,
@@ -29,10 +28,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [results, setResults] = useState<SearchItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTabStats, setActiveTabStats] = useState<{ total: number; satellite: number; businesses: number; profiles: number }>({
+  const [activeTabStats, setActiveTabStats] = useState<{ total: number; satellite: number; profiles: number }>({
     total: 0,
     satellite: 0,
-    businesses: 0,
     profiles: 0,
   });
 
@@ -41,7 +39,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     try {
       const typeParam = typeFilter === 'profiles' ? 'users' : typeFilter;
       const res = await searchApi.search(searchTerm, typeParam, 30);
-      let items = res.items || [];
+      let items = (res.items || []).filter((i) => i.type !== 'businesses');
 
       if (categoryFilter && categoryFilter !== 'all') {
         items = items.filter((item: any) =>
@@ -55,13 +53,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       // Compute counts
       const satCount = items.filter((i) => i.type === 'satellite_target').length;
-      const busCount = items.filter((i) => i.type === 'businesses').length;
       const usrCount = items.filter((i) => i.type === 'users').length;
 
       setActiveTabStats({
         total: items.length,
         satellite: satCount,
-        businesses: busCount,
         profiles: usrCount,
       });
     } catch (err) {
@@ -88,8 +84,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
     if (item.type === 'satellite_target') {
       // Direct to Change Intelligence or Satellite Hub
       setActiveTab('change-intelligence');
-    } else if (item.type === 'businesses') {
-      setActiveTab('business-intelligence');
     } else if (item.type === 'users') {
       setActiveTab('settings');
     }
@@ -101,12 +95,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
       icon: <Globe size={16} color="#34d399" />,
       color: '#34d399',
       bg: 'rgba(52, 211, 153, 0.12)',
-    },
-    businesses: {
-      label: 'Verified Enterprise',
-      icon: <Building2 size={16} color="#38bdf8" />,
-      color: '#38bdf8',
-      bg: 'rgba(56, 189, 248, 0.12)',
     },
     users: {
       label: 'Operator Profile',
@@ -148,12 +136,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
               Continental Intelligence Discovery
             </span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-              AFRIQORA Directory &amp; Target Search
+              AFRIQORA Satellite &amp; Geospatial Target Search
             </h1>
           </div>
         </div>
         <p style={{ color: '#94a3b8', fontSize: '0.92rem', maxWidth: '780px', lineHeight: 1.55, margin: 0 }}>
-          Search across African satellite observation concessions, Earth observation hotspots, verified commercial enterprises, and space technology operators.
+          Search across African satellite observation concessions, Earth observation hotspots, maritime port corridors, and space technology operators.
         </p>
 
         {/* Search Input Bar */}
@@ -173,7 +161,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           <Search size={22} color="#38bdf8" />
           <input
             type="text"
-            placeholder="Search satellite corridors, mining concessions, African enterprises, or profiles (e.g., GERD, Tenke, Solar)..."
+            placeholder="Search satellite corridors, mining concessions, maritime ports, or operator profiles (e.g., GERD, Tenke, Suez, Richards Bay)..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{
@@ -226,7 +214,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
           {[
             { id: 'all', label: 'All Results', count: activeTabStats.total },
             { id: 'satellite', label: 'Satellite Targets & Hotspots', count: activeTabStats.satellite },
-            { id: 'businesses', label: 'Verified Enterprises', count: activeTabStats.businesses },
             { id: 'profiles', label: 'Operator Profiles', count: activeTabStats.profiles },
           ].map((tab) => {
             const isActive = selectedType === tab.id;

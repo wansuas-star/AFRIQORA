@@ -8,16 +8,14 @@ import fs from 'fs';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 4001;
 
 import authRoutes from './modules/auth/auth.routes';
 import usersRoutes from './modules/users/users.routes';
-import monetizationRoutes from './modules/monetization/monetization.routes';
 import connectRoutes from './modules/connect/connect.routes';
 import searchRoutes from './modules/search/search.routes';
 import notificationsRoutes from './modules/notifications/notifications.routes';
-import commercialRoutes from './modules/commercial/commercial.routes';
-import adminRoutes from './modules/admin/admin.routes';
 import satelliteRoutes from './modules/satellite/satellite.routes';
 import governmentRoutes from './modules/government/government.routes';
 import conflictRoutes from './modules/conflict/conflict.routes';
@@ -49,8 +47,12 @@ const defaultAllowedOrigins = [
   'http://127.0.0.1:4001',
 ];
 
-const envOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+const rawOrigins = [process.env.ALLOWED_ORIGINS, process.env.CORS_ORIGIN]
+  .filter(Boolean)
+  .join(',');
+
+const envOrigins = rawOrigins
+  ? rawOrigins.split(',').map((o) => o.trim()).filter(Boolean)
   : [];
 
 const allowedOrigins = new Set([...defaultAllowedOrigins, ...envOrigins]);
@@ -125,15 +127,26 @@ app.use('/api/conflict', conflictRoutes);
 // Government Investigative Intelligence & Universal Integration API
 app.use('/api/gov', governmentRoutes);
 
-// Core Enterprise, Identity & Commercial API Routes
+// Core Identity, Connectivity, Search & Notifications API Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
-app.use('/api/commercial', commercialRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/monetization', monetizationRoutes);
 app.use('/api/connect', connectRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/notifications', notificationsRoutes);
+
+// Decommissioned Commercial, Business & Advertising Endpoints (HTTP 410 Gone)
+const decommissionedCommercialHandler = (_req: Request, res: Response) => {
+  res.status(410).json({
+    error: 'AFRIQORA is exclusively a satellite technology, satellite communications, Earth observation, and geospatial intelligence platform. Commercial, business directory, verification, and advertising functionality has been decommissioned.',
+    code: 'COMMERCIAL_MODULE_DECOMMISSIONED',
+  });
+};
+
+app.use('/api/commercial', decommissionedCommercialHandler);
+app.use('/api/admin/moderation', decommissionedCommercialHandler);
+app.use('/api/admin/commercial', decommissionedCommercialHandler);
+app.use('/api/admin', decommissionedCommercialHandler);
+app.use('/api/monetization', decommissionedCommercialHandler);
 
 // Decommissioned Social Media Endpoints (HTTP 410 Gone)
 const decommissionedSocialHandler = (_req: Request, res: Response) => {

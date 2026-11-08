@@ -99,6 +99,29 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   next();
 };
 
+export function getPlatformOwnerEmail(): string {
+  return (process.env.PLATFORM_OWNER_EMAIL || '').trim().toLowerCase();
+}
+
+/**
+ * Canonical Single-Owner Verification Rule:
+ * 1. User record must exist and have isPlatformOwner === true in the database.
+ * 2. PLATFORM_OWNER_EMAIL must be explicitly configured in the environment (fails closed if missing).
+ * 3. user.email must strictly match PLATFORM_OWNER_EMAIL (AND logic, never OR, zero fallback shortcuts).
+ */
+export function isVerifiedPlatformOwner(
+  user?: { email?: string | null; isPlatformOwner?: boolean | null } | null
+): boolean {
+  if (!user || !user.email || !user.isPlatformOwner) {
+    return false;
+  }
+  const ownerEmail = getPlatformOwnerEmail();
+  if (!ownerEmail) {
+    return false;
+  }
+  return Boolean(user.isPlatformOwner) && user.email.trim().toLowerCase() === ownerEmail;
+}
+
 /**
  * Single Platform Owner Authorization Guard
  * Strictly restricts execution to the designated single global platform owner.
@@ -119,10 +142,7 @@ export const requirePlatformOwner = async (req: AuthenticatedRequest, res: Respo
     return res.status(401).json({ error: 'Unauthorized: User not found' });
   }
 
-  const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL || '').trim().toLowerCase();
-  const isEmailMatch = ownerEmail ? user.email.toLowerCase() === ownerEmail : true;
-
-  if (!user.isPlatformOwner || !isEmailMatch) {
+  if (!isVerifiedPlatformOwner(user)) {
     return res.status(403).json({
       error: 'Forbidden: Platform Owner authority required. Action strictly restricted to single platform owner.',
     });

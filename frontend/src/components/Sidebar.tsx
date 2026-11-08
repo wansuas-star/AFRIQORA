@@ -4,8 +4,6 @@ import {
   Orbit,
   Layers,
   Pickaxe,
-  Building2,
-  Sparkles,
   Search,
   Bell,
   Radio,
@@ -21,8 +19,6 @@ export type NavTab =
   | 'change-intelligence'
   | 'earth-observation'
   | 'mining'
-  | 'business-intelligence'
-  | 'jobs'
   | 'search'
   | 'notifications'
   | 'settings';
@@ -94,19 +90,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Mining Intelligence',
       icon: <Pickaxe size={18} />,
       accentColor: '#fbbf24',
-    },
-    {
-      id: 'business-intelligence',
-      label: 'Business Intelligence',
-      icon: <Building2 size={18} />,
-      accentColor: '#60a5fa',
-    },
-    {
-      id: 'jobs',
-      label: 'Jobs and Opportunities',
-      icon: <Sparkles size={18} />,
-      badge: 'Active',
-      accentColor: '#a78bfa',
     },
     {
       id: 'search',
